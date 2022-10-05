@@ -25,7 +25,7 @@ def _format_mac_address(mac_type):
     return mac_type
 
 
-def _find_ethernet_type(frame):
+def _find_frame_type(frame):
     typeInt = int(frame[24:28], 16)
     if typeInt >= 1536:
         return "ETHERNET II"
@@ -37,65 +37,63 @@ def _find_ethernet_type(frame):
         return "IEE 802.3 LLC"
 
 
+def _find_sap_type(frame):
+    typeInt = int(frame[24:28], 16)
+    pass
+
+
 if __name__ == '__main__':
 
     # fileName = input("Zadajte názov súboru: ")
     # pcap = scapy.rdpcap(fileName)
-    pcap = scapy.rdpcap("pcap_files/eth-1.pcap")
+    pcap = scapy.rdpcap("pcap_files/eth-3.pcap")
     order = 1
+    initial_dictionary = {'name': 'PKS2022/23',
+                          'pcap_name': 'all.cap'}
+    packets_dictionary = {"packets": []}
+
+    with open("frames.yaml", "w") as file:
+        init_file = yaml.dump(initial_dictionary, file, default_flow_style=False, sort_keys=False)
+
     for pkt in pcap:
+        len_frame_cap = len(pkt)
         frameInHex = scapy.raw(pkt).hex()
-        print(order)
-        print("Frame: ", frameInHex)
         destination_mac = _find_destination_mac(frameInHex)
-        print("Destination MAC: ", destination_mac)
         source_mac = _find_source_mac(frameInHex)
-        print("Source MAC: ", source_mac)
-        ethernet_type = _find_ethernet_type(frameInHex)
-        if ethernet_type == "ETHERNET II":
-            print("Ethernet II")
-        elif ethernet_type == "raw":
-            print("IEE 802.3 - Raw")
-        elif ethernet_type == "IEE 802.3 s LLC a SNAP":
-            print("IEE 802.3 s LLC a SNAP")
-        elif ethernet_type == "IEE 802.3 LLC":
-            print("IEE 802.3 LLC")
+        frame_type = _find_frame_type(frameInHex)
 
-        frames_dictionary = {'name': 'PKS2022/23',
-                             'pcap_name': 'all.cap',
-                             "packets": {
-                                 "frame_number": order,
-                                 "frame_type": ethernet_type,
-                                 "src_mac": source_mac,
-                                 "dst_mac": destination_mac,
-                                 "hexa_frame": frameInHex,
-                             }}
+        if frame_type == "IEE 802.3 - Raw" or frame_type == "IEE 802.3 s LLC a SNAP" or frame_type == "IEE 802.3 LLC":
+            sap = _find_sap_type(frameInHex)
 
+        frames_dictionary = {"frame_number": order,
+                             "len_frame_cap": len_frame_cap,
+                             "frame_type": frame_type,
+                             "src_mac": source_mac,
+                             "dst_mac": destination_mac,
+                             "string": frameInHex}
 
-        # print(frames_dictionary)
-        # with open(r'schema-task-1.yaml', 'w') as file:
-        #   documents = yaml.dump(frames_dictionary, file)
+        packets_dictionary["packets"].append(frames_dictionary)
+        order += 1
 
-        with open('frames.yaml', 'r+') as output_stream:
-            documents = yaml.safe_load(output_stream)
-            documents = yaml.dump(frames_dictionary, output_stream, default_flow_style=False, sort_keys=False)
+    with open('frames.yaml', 'r+') as output_stream:
+        documents = yaml.safe_load(output_stream)
+        documents = yaml.dump(packets_dictionary, output_stream, default_flow_style=False, sort_keys=False)
 
         # print("Name: PKS2022/23\n"
-            #     "pcap_name: all.pcap\n"
-            # "packets: \n"
-            # " - frame_number: ", order, "\n"
-            #                             "   len_frame_pcap: ", "\n"
-            #                                                    "   len_frame_medium: ", "\n"
-            #                                                                             "   frame_type: ",
-            # ethernet_type, "\n"
-            #                "   src_mac: ", source_mac, "\n"
-            #                                            "   dst_mac: ", destination_mac, "\n"
-            #                                                                             "   ether_type: ", "\n"
-            #                                                                                                "   src_ip: ",
-            # "\n"
-            # "   protocol: ", "\n"
-            #                  "   src_port: ", "\n"
-            #                                   "   dst_port: ", "\n"
-            #                                                    "   app_protocol: ", "\n"
+        #     "pcap_name: all.pcap\n"
+        # "packets: \n"
+        # " - frame_number: ", order, "\n"
+        #                             "   len_frame_pcap: ", "\n"
+        #                                                    "   len_frame_medium: ", "\n"
+        #                                                                             "   frame_type: ",
+        # frame_type, "\n"
+        #                "   src_mac: ", source_mac, "\n"
+        #                                            "   dst_mac: ", destination_mac, "\n"
+        #                                                                             "   ether_type: ", "\n"
+        #                                                                                                "   src_ip: ",
+        # "\n"
+        # "   protocol: ", "\n"
+        #                  "   src_port: ", "\n"
+        #                                   "   dst_port: ", "\n"
+        #                                                    "   app_protocol: ", "\n"
         #                                                                         "   hexa_frame: |\n", frameInHex)
-        order += 1
