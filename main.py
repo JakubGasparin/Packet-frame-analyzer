@@ -51,29 +51,28 @@ def _find_sap_type(frame):
         get_PID = (yaml.safe_load(stream))
 
     sap_number = frame[40:44]
-    #print(frame)
+    # print(frame)
     #  print(get_PID)
-  #  print(sap_number)
+    #  print(sap_number)
 
     if sap_number in get_PID:
         PID = get_PID[sap_number]
-       # print(sap_number, PID)
+        # print(sap_number, PID)
         return PID
-
 
     # print(sap_number)
     with open("Protocols/l2.txt", "r") as protocol_file:
         for line in protocol_file:
             # print(line)
             if line == "#LSAPs\n":
-             #   print(line)
+                #   print(line)
                 # folder_line = protocol_file.readline()
                 # print(folder_line)
                 for line_2 in protocol_file:
                     if line_2 == "#IP Protocol numbers\n":
                         break
-                    #else:
-                     #   print(line_2)
+                    # else:
+                    #   print(line_2)
             # print(line)
 
     # print(f.read())
@@ -305,11 +304,15 @@ def _check_if_its_is_well_known_protocol(src_port, dst_port):
 if __name__ == '__main__':
     # fileName = input("Zadajte názov súboru: ")
     # pcap = scapy.rdpcap(fileName)
-    pcap = scapy.rdpcap("pcap_files/trace-27.pcap")
+    pcap = scapy.rdpcap("pcap_files/trace-10.pcap")
     order = 1
     initial_dictionary = {'name': 'PKS2022/23',
                           'pcap_name': 'all.cap'}
     packets_dictionary = {"packets": []}
+    ipv4_packets_dictionary = {"ipv4_senders": []}
+    max_packets_dictionary = {"max_send_packets_by": []}
+    unique_src_ip_list = []
+    unique_counter = []
 
     with open("frames.yaml", "w") as file:
         yaml.dump(initial_dictionary, file, default_flow_style=False, sort_keys=False)
@@ -326,11 +329,8 @@ if __name__ == '__main__':
         destination_mac = _find_destination_mac(frameInHex)
         source_mac = _find_source_mac(frameInHex)
         frame_type = _find_frame_type(frameInHex)
-        # sap = _find_sap_type(frameInHex)
         formated_frame = _format_frame(frameInHex)
-        # print(frame_type)
         if frame_type == "IEE 802.3 - Raw" or frame_type == "IEE 802.3 LLC":
-
             frames_dictionary = {"frame_nuber": order,
                                  "len_frame_pcap": len_frame_pcap,
                                  "len_frame_medium": len_frame_medium,
@@ -360,7 +360,7 @@ if __name__ == '__main__':
             second_layer_protocol = _find_second_eth_layer_protocol(frameInHex)
 
             if second_layer_protocol == 0:
-               # print("got here")
+                # print("got here")
                 frames_dictionary = {"frame_number": order,
                                      "len_frame_pcap": len_frame_pcap,
                                      "len_frame_medium": len_frame_medium,
@@ -392,7 +392,6 @@ if __name__ == '__main__':
                 order += 1
 
             if second_layer_protocol == "IPv6":
-
                 frames_dictionary = {"frame_number": order,
                                      "len_frame_pcap": len_frame_pcap,
                                      "len_frame_medium": len_frame_medium,
@@ -406,9 +405,39 @@ if __name__ == '__main__':
                 packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
 
-
             if second_layer_protocol == "IPv4":
                 src_ip, dst_ip = _find_ip(frameInHex, second_layer_protocol)
+
+                if src_ip not in unique_src_ip_list:
+                    unique_src_ip_list.append(src_ip)
+                    index = unique_src_ip_list.index(src_ip)
+                    # print(index)
+                    unique_counter.append(1)
+                # print(unique_counter)
+                # print(unique_src_ip_list)
+                # print(src_ip)
+                # print(unique_src_ip_list)
+                # print(src_ip)
+                # src_ip_dictionary = {"node:": src_ip,
+                #                    "number_of_sent_packets": 1}
+                # ipv4_packets_dictionary["ipv4_senders"].append(src_ip_dictionary)
+                # print(ipv4_packets_dictionary)
+
+                elif src_ip in unique_src_ip_list:
+                    index = unique_src_ip_list.index(src_ip)
+                    unique_counter[index] = unique_counter[index] + 1
+                # print(unique_counter)
+                # print(index)
+                # print(src_ip)
+                # temp = src_ip_dictionary["number_of_sent_packets"]
+                # print(temp)
+                # temp = temp + 1
+                # print(temp)
+                # print(src_ip_dictionary)
+                # src_ip_dictionary["number_of_sent_packets"] = temp
+                #  print(ipv4_packets_dictionary)
+                # print(src_ip_dictionary)
+
                 protocol = _find_IPv4_protocol(frameInHex)
 
                 if protocol == "TCP" or protocol == "UDP":
@@ -454,45 +483,37 @@ if __name__ == '__main__':
                     packets_dictionary["packets"].append(frames_dictionary)
                     order += 1
 
+    #            else:
+    #               frames_dictionary = {"frame_number": order,
+    #                "len_frame_pcap": len_frame_pcap,
+    #                "len_frame_medium": len_frame_medium,
+    #                "frame_type": frame_type,
+    #                "src_mac": source_mac,
+    #                "dst_mac": destination_mac,
+    #                "ether_type": second_layer_protocol,
+    #                "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+    #                }
 
+    # packets_dictionary["packets"].append(frames_dictionary)
+    # order += 1
+    max_packets = 0
+    max_send_packets_by = []
+    for i in range(len(unique_counter)):
+        # print(unique_counter[i])
+        temp = unique_counter[i]
+        if max_packets <= temp:
+            max_packets = temp
+            max_send_packets_by.append(unique_src_ip_list[i])
+        src_ip_dictionary = {"nodes": unique_src_ip_list[i],
+                             "number_of_sent_packets": unique_counter[i]}
+        ipv4_packets_dictionary["ipv4_senders"].append(src_ip_dictionary)
 
-#            else:
-                    #               frames_dictionary = {"frame_number": order,
-                    #                "len_frame_pcap": len_frame_pcap,
-                    #                "len_frame_medium": len_frame_medium,
-                    #                "frame_type": frame_type,
-                    #                "src_mac": source_mac,
-                    #                "dst_mac": destination_mac,
-                    #                "ether_type": second_layer_protocol,
-                    #                "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
-                #                }
-
-                #packets_dictionary["packets"].append(frames_dictionary)
-                #order += 1
-
-
+    for i in range(len(max_send_packets_by)):
+        max_packets_dictionary["max_send_packets_by"] = max_send_packets_by[i]
 
     with open('frames.yaml', 'r+') as output_stream:
         yaml = ruamel.yaml.YAML()
         yaml.default_flow_style = False
         yaml.dump(packets_dictionary, output_stream)
-        # documents = yaml.dump(packets_dictionary, output_stream, default_flow_style=False, sort_keys=False)
-
-        # print("Name: PKS2022/23\n"
-        #     "pcap_name: all.pcap\n"
-        # "packets: \n"
-        # " - frame_number: ", order, "\n"
-        #                             "   len_frame_pcap: ", "\n"
-        #                                                    "   len_frame_medium: ", "\n"
-        #                                                                             "   frame_type: ",
-        # frame_type, "\n"
-        #                "   src_mac: ", source_mac, "\n"
-        #                                            "   dst_mac: ", destination_mac, "\n"
-        #                                                                             "   ether_type: ", "\n"
-        #                                                                                                "   src_ip: ",
-        # "\n"
-        # "   protocol: ", "\n"
-        #                  "   src_port: ", "\n"
-        #                                   "   dst_port: ", "\n"
-        #                                                    "   app_protocol: ", "\n"
-        #                                                                         "   hexa_frame: |\n", frameInHex)
+        yaml.dump(ipv4_packets_dictionary, output_stream)
+        yaml.dump(max_packets_dictionary, output_stream)
