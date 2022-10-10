@@ -47,20 +47,33 @@ def _find_sap_type(frame):
     # typeInt = int(frame[42:46], 16)
     # sap_number = frame[40:44] # PID
 
-    sap_number = frame[28:32]
-    print(sap_number)
+    with open("Protocols/pid.yaml", "r") as stream:
+        get_PID = (yaml.safe_load(stream))
+
+    sap_number = frame[40:44]
+    #print(frame)
+    #  print(get_PID)
+  #  print(sap_number)
+
+    if sap_number in get_PID:
+        PID = get_PID[sap_number]
+       # print(sap_number, PID)
+        return PID
+
+
+    # print(sap_number)
     with open("Protocols/l2.txt", "r") as protocol_file:
         for line in protocol_file:
             # print(line)
             if line == "#LSAPs\n":
-                print(line)
+             #   print(line)
                 # folder_line = protocol_file.readline()
                 # print(folder_line)
                 for line_2 in protocol_file:
                     if line_2 == "#IP Protocol numbers\n":
                         break
-                    else:
-                        print(line_2)
+                    #else:
+                     #   print(line_2)
             # print(line)
 
     # print(f.read())
@@ -100,31 +113,15 @@ def _format_frame(frame):
 
 def _find_second_eth_layer_protocol(frame):
     hex_number = frame[24:28]
-    hex_number = str(hex_number)
-    hex_number = "0x" + hex_number
-    protocol = ''
+    # print(frame )
+    with open("Protocols/ether_type.yaml", "r") as stream:
+        get_ethertype = (yaml.safe_load(stream))
     # print(hex_number)
-    with open("Protocols/l2.txt", "r") as protocol_file:
-        for line in protocol_file:
-            if line == "#Ethertypes\n":
-
-                for line_2 in protocol_file:
-                    if line_2 == "#LSAPs\n":
-                        break
-                    else:
-                        first_six = line_2[0:6]
-                        if hex_number == first_six:
-                            protocol = line_2[7:11]
-
-    # print(hex_number)
-    # print(hex_number, protocol)
-    if not protocol:
-        pass
+    if hex_number in get_ethertype:
+        ether_type = get_ethertype[hex_number]
+        return ether_type
     else:
-        if protocol[-1] == '\n':
-            protocol = protocol.strip(protocol[-1])
-    # print(hex_number, protocol)
-    return protocol
+        return 0
 
 
 def _find_ip(frame, protocol):
@@ -198,57 +195,117 @@ def _find_dst_ip_ARP(frame):
 
 def _find_IPv4_protocol(frame):
     hex_number = frame[46:48]
-    hex_number = str(hex_number)
-    hex_number = "0x" + hex_number
-    prtc = ''
+    # hex_number = str(hex_number)
+    #  hex_number = "0x" + hex_number
 
-    with open("Protocols/l2.txt") as protocol_file:
-        for line in protocol_file:
-            if line == "#IP Protocol numbers\n":
-                for line_2 in protocol_file:
-                    if line_2 == "#TCP ports\n":
-                        break
-                    else:
-                        first_four = line_2[0:4]
-                        if hex_number == first_four:
-                            prtc = line_2[7:10]
+    # hex_number = frame[24:28]
+    with open("Protocols/protocol.yaml", "r") as stream:
+        get_protocol = (yaml.safe_load(stream))
+
+    ipv4_protocol = get_protocol[hex_number]
+    # print(ipv4_protocol)
+
+    # with open("Protocols/l2.txt") as protocol_file:
+    #   for line in protocol_file:
+    #       if line == "#IP Protocol numbers\n":
+    #           for line_2 in protocol_file:
+    #               if line_2 == "#TCP ports\n":
+    #                   break
+    #    else:
+    # first_four = line_2[0:4]
+    #   if hex_number == first_four:
+    #       prtc = line_2[7:10]
 
     # print(hex_number, prtc)
-    return prtc
+    return ipv4_protocol
 
-def _find_TCP_port(frame):
+
+def _find_src_TCP_app_protocol(frame):
     src_port_number = frame[68:72]
-    dst_port_number = frame[72:76]
+    return src_port_number
+    #  src_well_known_port = '.'
+
+    #  with open("Protocols/app_protocol.yaml", "r") as stream:
+    #    check_for_app_protocol = (yaml.safe_load(stream))
+
+    ## if src_port_number in check_for_app_protocol:
+    #  print("source app protocol exists")
+    #     src_well_known_port = check_for_app_protocol[src_port_number]
+    #    return src_port_number, src_well_known_port
+    # print(src_well_known_port)
+    # else:
+    # print(src_port_number)
+    #     return src_port_number, src_well_known_port
+
+    # ipv4_protocol = get_protocol[hex_number]
     src_well_known_port = ''
     dst_well_known_port = ''
 
-    with open("Protocols/l2.txt") as port_file:
-        for line in port_file:
-            if line == "#TCP ports\n":
-                for line_2 in port_file:
-                    if line_2 == "#UDP ports\n":
-                        break
-                    else:
-                        first_six = line_2[0:6]
-                        if src_port_number == first_six:
-                            src_well_known_port = " ".join(re.findall("[a-zA-Z]+", line_2))
-                        if dst_port_number == first_six:
-                            dst_well_known_port = " ".join(re.findall("[a-zA-Z]+", line_2))
+    # with open("Protocols/l2.txt") as port_file:
+    #    for line in port_file:
+    #       if line == "#TCP ports\n":
+    #           for line_2 in port_file:
+    #               if line_2 == "#UDP ports\n":
+    #                   break
+    #               else:
+    #                   first_six = line_2[0:6]
+    #                   if src_port_number == first_six:
+    #                       src_well_known_port = " ".join(re.findall("[a-zA-Z]+", line_2))
+    #                   if dst_port_number == first_six:
+    #                       dst_well_known_port = " ".join(re.findall("[a-zA-Z]+", line_2))
 
-    print(src_well_known_port, dst_well_known_port)
+    #  print(src_well_known_port, dst_well_known_port)
 
 
+# return src_port_number
 
-    #print(src_port_number)
-    #print(dst_port_number)
+# print(src_port_number)
+# print(dst_port_number)
 
+
+def _find_dst_TCP_app_protocol(frame):
+    dst_port_number = frame[72:76]
+    # print(dst_port_number)
+    # with open("Protocols/app_protocol.yaml", "r") as stream:
+    #     check_for_app_protocol = (yaml.safe_load(stream))
+    # if dst_port_number in check_for_app_protocol:
+    #     dst_port_number = check_for_app_protocol[dst_port_number]
+
+    #  print(dst_port_number)
+
+    # dst_well_known_port = ''
+    return dst_port_number
+
+
+#  with open("Protocols/app_protocol.yaml", "r") as stream:
+#     check_for_app_protocol = (yaml.safe_load(stream))
+
+# if dst_port_number in check_for_app_protocol:
+#   # print("dst app protocol exists")
+#   dst_well_known_port = check_for_app_protocol[dst_port_number]
+#   return dst_port_number, dst_well_known_port
+# else:
+#   return dst_port_number, dst_well_known_port
+
+
+def _check_if_its_is_well_known_protocol(src_port, dst_port):
+    with open("Protocols/app_protocol.yaml", "r") as stream:
+        check_for_app_protocol = (yaml.safe_load(stream))
+
+    if src_port in check_for_app_protocol:
+        well_known = check_for_app_protocol[src_port]
+        return well_known
+    elif dst_port in check_for_app_protocol:
+        well_known = check_for_app_protocol[dst_port]
+        return well_known
+    else:
+        return None
 
 
 if __name__ == '__main__':
-
     # fileName = input("Zadajte názov súboru: ")
     # pcap = scapy.rdpcap(fileName)
-    pcap = scapy.rdpcap("pcap_files/eth-1.pcap")
+    pcap = scapy.rdpcap("pcap_files/trace-27.pcap")
     order = 1
     initial_dictionary = {'name': 'PKS2022/23',
                           'pcap_name': 'all.cap'}
@@ -272,10 +329,49 @@ if __name__ == '__main__':
         # sap = _find_sap_type(frameInHex)
         formated_frame = _format_frame(frameInHex)
         # print(frame_type)
+        if frame_type == "IEE 802.3 - Raw" or frame_type == "IEE 802.3 LLC":
+
+            frames_dictionary = {"frame_nuber": order,
+                                 "len_frame_pcap": len_frame_pcap,
+                                 "len_frame_medium": len_frame_medium,
+                                 "frame_type": frame_type,
+                                 "src_mac": source_mac,
+                                 "dst_mac": destination_mac,
+                                 "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                                 }
+            packets_dictionary["packets"].append(frames_dictionary)
+            order += 1
+
         if frame_type == "IEE 802.3 s LLC a SNAP":
-            sap = _find_sap_type(frameInHex)
+            pid = _find_sap_type(frameInHex)
+            frames_dictionary = {"frame_number": order,
+                                 "len_frame_pcap": len_frame_pcap,
+                                 "len_frame_medium": len_frame_medium,
+                                 "frame_type": frame_type,
+                                 "src_mac": source_mac,
+                                 "dst_mac": destination_mac,
+                                 "pid": pid,
+                                 "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                                 }
+            packets_dictionary["packets"].append(frames_dictionary)
+            order += 1
+
         if frame_type == "ETHERNET II":
             second_layer_protocol = _find_second_eth_layer_protocol(frameInHex)
+
+            if second_layer_protocol == 0:
+               # print("got here")
+                frames_dictionary = {"frame_number": order,
+                                     "len_frame_pcap": len_frame_pcap,
+                                     "len_frame_medium": len_frame_medium,
+                                     "frame_type": frame_type,
+                                     "src_mac": source_mac,
+                                     "dst_mac": destination_mac,
+                                     "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                                     }
+                packets_dictionary["packets"].append(frames_dictionary)
+                order += 1
+
             # print(second_layer_protocol)
             if second_layer_protocol == "ARP":
                 src_ip, dst_ip = _find_ip(frameInHex, second_layer_protocol)
@@ -295,53 +391,86 @@ if __name__ == '__main__':
                 packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
 
+            if second_layer_protocol == "IPv6":
+
+                frames_dictionary = {"frame_number": order,
+                                     "len_frame_pcap": len_frame_pcap,
+                                     "len_frame_medium": len_frame_medium,
+                                     "frame_type": frame_type,
+                                     "src_mac": source_mac,
+                                     "dst_mac": destination_mac,
+                                     "ether_type": second_layer_protocol,
+                                     "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                                     }
+
+                packets_dictionary["packets"].append(frames_dictionary)
+                order += 1
+
+
             if second_layer_protocol == "IPv4":
                 src_ip, dst_ip = _find_ip(frameInHex, second_layer_protocol)
                 protocol = _find_IPv4_protocol(frameInHex)
 
-                if protocol == "TCP":
-                    src_port, dst_port = _find_TCP_port(frameInHex)
-                frames_dictionary = {"frame_number": order,
-                                     "len_frame_pcap": len_frame_pcap,
-                                     "len_frame_medium": len_frame_medium,
-                                     "frame_type": frame_type,
-                                     "src_mac": source_mac,
-                                     "dst_mac": destination_mac,
-                                     "ether_type": second_layer_protocol,
-                                     "src_ip": src_ip,
-                                     "dst_ip": dst_ip,
-                                     "protocol": protocol,
-                                     "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
-                                     }
+                if protocol == "TCP" or protocol == "UDP":
+                    src_port = _find_src_TCP_app_protocol(frameInHex)
+                    dst_port = _find_dst_TCP_app_protocol(frameInHex)
+                    app_protocol = _check_if_its_is_well_known_protocol(src_port, dst_port)
+                    src_port = int(src_port, 16)
+                    dst_port = int(dst_port, 16)
 
-                packets_dictionary["packets"].append(frames_dictionary)
-                order += 1
+                    frames_dictionary = {"frame_number": order,
+                                         "len_frame_pcap": len_frame_pcap,
+                                         "len_frame_medium": len_frame_medium,
+                                         "frame_type": frame_type,
+                                         "src_mac": source_mac,
+                                         "dst_mac": destination_mac,
+                                         "ether_type": second_layer_protocol,
+                                         "src_ip": src_ip,
+                                         "dst_ip": dst_ip,
+                                         "protocol": protocol,
+                                         "src_port": src_port,
+                                         "dst_port": dst_port,
+                                         "app_protocol": app_protocol,
+                                         "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                                         }
 
-            else:
-                frames_dictionary = {"frame_number": order,
-                                     "len_frame_pcap": len_frame_pcap,
-                                     "len_frame_medium": len_frame_medium,
-                                     "frame_type": frame_type,
-                                     "src_mac": source_mac,
-                                     "dst_mac": destination_mac,
-                                     "ether_type": second_layer_protocol,
-                                     "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
-                                     }
+                    packets_dictionary["packets"].append(frames_dictionary)
+                    order += 1
 
-                packets_dictionary["packets"].append(frames_dictionary)
-                order += 1
+                else:
+                    frames_dictionary = {"frame_number": order,
+                                         "len_frame_pcap": len_frame_pcap,
+                                         "len_frame_medium": len_frame_medium,
+                                         "frame_type": frame_type,
+                                         "src_mac": source_mac,
+                                         "dst_mac": destination_mac,
+                                         "ether_type": second_layer_protocol,
+                                         "src_ip": src_ip,
+                                         "dst_ip": dst_ip,
+                                         "protocol": protocol,
+                                         "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                                         }
 
-        if frame_type == "IEE 802.3 - Raw" or frame_type == "IEE 802.3 s LLC a SNAP" or frame_type == "IEE 802.3 LLC":
-            frames_dictionary = {"frame_nuber": order,
-                                 "len_frame_pcap": len_frame_pcap,
-                                 "len_frame_medium": len_frame_medium,
-                                 "frame_type": frame_type,
-                                 "src_mac": source_mac,
-                                 "dst_mac": destination_mac,
-                                 "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
-                                 }
-            packets_dictionary["packets"].append(frames_dictionary)
-            order += 1
+                    packets_dictionary["packets"].append(frames_dictionary)
+                    order += 1
+
+
+
+#            else:
+                    #               frames_dictionary = {"frame_number": order,
+                    #                "len_frame_pcap": len_frame_pcap,
+                    #                "len_frame_medium": len_frame_medium,
+                    #                "frame_type": frame_type,
+                    #                "src_mac": source_mac,
+                    #                "dst_mac": destination_mac,
+                    #                "ether_type": second_layer_protocol,
+                    #                "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                #                }
+
+                #packets_dictionary["packets"].append(frames_dictionary)
+                #order += 1
+
+
 
     with open('frames.yaml', 'r+') as output_stream:
         yaml = ruamel.yaml.YAML()
