@@ -305,7 +305,7 @@ def _check_if_its_is_well_known_protocol(src_port, dst_port):
 if __name__ == '__main__':
     # fileName = input("Zadajte názov súboru: ")
     # pcap = scapy.rdpcap(fileName)
-    pcap = scapy.rdpcap("pcap_files/eth-5.pcap")
+    pcap = scapy.rdpcap("pcap_files/trace-27.pcap")
     order = 1
     initial_dictionary = {'name': 'PKS2022/23',
                           'pcap_name': 'all.cap'}
@@ -343,6 +343,7 @@ if __name__ == '__main__':
         source_mac = _find_source_mac(frameInHex)
         frame_type = _find_frame_type(frameInHex)
         formated_frame = _format_frame(frameInHex)
+        formated_frame += "\n"
 
         print(frame_type, order)
 
@@ -496,8 +497,12 @@ if __name__ == '__main__':
     for i in range(len(unique_counter)):
         # print(unique_counter[i])
         temp = unique_counter[i]
-        if max_packets <= temp:
+        if max_packets == temp:
             max_packets = temp
+            max_send_packets_by.append(unique_src_ip_list[i])
+        elif max_packets < temp:
+            max_packets = temp
+            max_send_packets_by.clear()
             max_send_packets_by.append(unique_src_ip_list[i])
         src_ip_dictionary = {"nodes": unique_src_ip_list[i],
                              "number_of_sent_packets": unique_counter[i]}
