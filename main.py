@@ -61,22 +61,23 @@ def _find_sap_type(frame):
         return PID
 
     # print(sap_number)
-    with open("Protocols/l2.txt", "r") as protocol_file:
-        for line in protocol_file:
-            # print(line)
-            if line == "#LSAPs\n":
-                #   print(line)
-                # folder_line = protocol_file.readline()
-                # print(folder_line)
-                for line_2 in protocol_file:
-                    if line_2 == "#IP Protocol numbers\n":
-                        break
-                    # else:
-                    #   print(line_2)
-            # print(line)
 
-    # print(f.read())
-    pass
+
+# with open("Protocols/l2.txt", "r") as protocol_file:
+#    for line in protocol_file:
+# print(line)
+#   if line == "#LSAPs\n":
+#   print(line)
+# folder_line = protocol_file.readline()
+# print(folder_line)
+#       for line_2 in protocol_file:
+#           if line_2 == "#IP Protocol numbers\n":
+#               break
+# else:
+#   print(line_2)
+# print(line)
+
+# print(f.read()
 
 
 def _format_frame(frame):
@@ -304,7 +305,7 @@ def _check_if_its_is_well_known_protocol(src_port, dst_port):
 if __name__ == '__main__':
     # fileName = input("Zadajte názov súboru: ")
     # pcap = scapy.rdpcap(fileName)
-    pcap = scapy.rdpcap("pcap_files/trace-10.pcap")
+    pcap = scapy.rdpcap("pcap_files/eth-5.pcap")
     order = 1
     initial_dictionary = {'name': 'PKS2022/23',
                           'pcap_name': 'all.cap'}
@@ -314,22 +315,37 @@ if __name__ == '__main__':
     unique_src_ip_list = []
     unique_counter = []
 
+    # for pkt in pcap:
+    #    frameInHex = scapy.raw(pkt).hex()
+    #   print(order, frameInHex, "\n")
+    #   order = order + 1
+
     with open("frames.yaml", "w") as file:
         yaml.dump(initial_dictionary, file, default_flow_style=False, sort_keys=False)
 
     for pkt in pcap:
-        len_frame_pcap = int(len(pkt) / 2)
+        len_frame_pcap = int(len(pkt))
         if len_frame_pcap >= 60:
             len_frame_medium = len_frame_pcap
             len_frame_medium += 4
         else:
             len_frame_medium = 64
 
+        # print("\n", order,"\n", pkt)
         frameInHex = scapy.raw(pkt).hex()
+        # print("\n", order, "\n", frameInHex)
+        # order = 1
+        # for packet in pcap:
+        #    frameInHex = scapy.raw(packet).hex()
+        #   print(order, frameInHex, "\n")
+        #   order = order + 1
         destination_mac = _find_destination_mac(frameInHex)
         source_mac = _find_source_mac(frameInHex)
         frame_type = _find_frame_type(frameInHex)
         formated_frame = _format_frame(frameInHex)
+
+        print(frame_type, order)
+
         if frame_type == "IEE 802.3 - Raw" or frame_type == "IEE 802.3 LLC":
             frames_dictionary = {"frame_nuber": order,
                                  "len_frame_pcap": len_frame_pcap,
@@ -360,7 +376,7 @@ if __name__ == '__main__':
             second_layer_protocol = _find_second_eth_layer_protocol(frameInHex)
 
             if second_layer_protocol == 0:
-                # print("got here")
+                print("got here")
                 frames_dictionary = {"frame_number": order,
                                      "len_frame_pcap": len_frame_pcap,
                                      "len_frame_medium": len_frame_medium,
@@ -372,7 +388,7 @@ if __name__ == '__main__':
                 packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
 
-            # print(second_layer_protocol)
+            print(second_layer_protocol)
             if second_layer_protocol == "ARP":
                 src_ip, dst_ip = _find_ip(frameInHex, second_layer_protocol)
 
@@ -391,7 +407,7 @@ if __name__ == '__main__':
                 packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
 
-            if second_layer_protocol == "IPv6":
+            elif second_layer_protocol == "IPv6":
                 frames_dictionary = {"frame_number": order,
                                      "len_frame_pcap": len_frame_pcap,
                                      "len_frame_medium": len_frame_medium,
@@ -405,38 +421,17 @@ if __name__ == '__main__':
                 packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
 
-            if second_layer_protocol == "IPv4":
+            elif second_layer_protocol == "IPv4":
                 src_ip, dst_ip = _find_ip(frameInHex, second_layer_protocol)
 
                 if src_ip not in unique_src_ip_list:
                     unique_src_ip_list.append(src_ip)
                     index = unique_src_ip_list.index(src_ip)
-                    # print(index)
                     unique_counter.append(1)
-                # print(unique_counter)
-                # print(unique_src_ip_list)
-                # print(src_ip)
-                # print(unique_src_ip_list)
-                # print(src_ip)
-                # src_ip_dictionary = {"node:": src_ip,
-                #                    "number_of_sent_packets": 1}
-                # ipv4_packets_dictionary["ipv4_senders"].append(src_ip_dictionary)
-                # print(ipv4_packets_dictionary)
 
                 elif src_ip in unique_src_ip_list:
                     index = unique_src_ip_list.index(src_ip)
                     unique_counter[index] = unique_counter[index] + 1
-                # print(unique_counter)
-                # print(index)
-                # print(src_ip)
-                # temp = src_ip_dictionary["number_of_sent_packets"]
-                # print(temp)
-                # temp = temp + 1
-                # print(temp)
-                # print(src_ip_dictionary)
-                # src_ip_dictionary["number_of_sent_packets"] = temp
-                #  print(ipv4_packets_dictionary)
-                # print(src_ip_dictionary)
 
                 protocol = _find_IPv4_protocol(frameInHex)
 
@@ -483,19 +478,19 @@ if __name__ == '__main__':
                     packets_dictionary["packets"].append(frames_dictionary)
                     order += 1
 
-    #            else:
-    #               frames_dictionary = {"frame_number": order,
-    #                "len_frame_pcap": len_frame_pcap,
-    #                "len_frame_medium": len_frame_medium,
-    #                "frame_type": frame_type,
-    #                "src_mac": source_mac,
-    #                "dst_mac": destination_mac,
-    #                "ether_type": second_layer_protocol,
-    #                "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
-    #                }
+            else:
+                frames_dictionary = {"frame_number": order,
+                                     "len_frame_pcap": len_frame_pcap,
+                                     "len_frame_medium": len_frame_medium,
+                                     "frame_type": frame_type,
+                                     "src_mac": source_mac,
+                                     "dst_mac": destination_mac,
+                                     "ether_type": second_layer_protocol,
+                                     "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)}
 
-    # packets_dictionary["packets"].append(frames_dictionary)
-    # order += 1
+                packets_dictionary["packets"].append(frames_dictionary)
+                order += 1
+
     max_packets = 0
     max_send_packets_by = []
     for i in range(len(unique_counter)):
@@ -508,8 +503,12 @@ if __name__ == '__main__':
                              "number_of_sent_packets": unique_counter[i]}
         ipv4_packets_dictionary["ipv4_senders"].append(src_ip_dictionary)
 
+    print(max_send_packets_by)
+
     for i in range(len(max_send_packets_by)):
-        max_packets_dictionary["max_send_packets_by"] = max_send_packets_by[i]
+        max_packets_dictionary["max_send_packets_by"].append(max_send_packets_by[i])
+
+    print(max_packets_dictionary)
 
     with open('frames.yaml', 'r+') as output_stream:
         yaml = ruamel.yaml.YAML()
