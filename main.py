@@ -1,7 +1,6 @@
 import scapy.all as scapy
 import yaml
 import ruamel.yaml.scalarstring
-import re
 
 
 def _find_destination_mac(frame):
@@ -23,13 +22,10 @@ def _format_mac_address(mac_type):
     mac_type = mac_type[:8] + ":" + mac_type[8:]
     mac_type = mac_type[:11] + ":" + mac_type[11:]
     mac_type = mac_type[:14] + ":" + mac_type[14:]
-    # print(mac_type)
     return mac_type
 
 
 def _find_frame_type(frame):
-    # check_eth = frame[24:28]
-    # print(check_eth)
     typeInt = int(frame[24:28], 16)
     if typeInt >= 1536:
         return "ETHERNET II"
@@ -42,47 +38,19 @@ def _find_frame_type(frame):
 
 
 def _find_sap_type(frame):
-    # typeInt = int(frame[24:28], 16)
-    folder_line = 0
-    # typeInt = int(frame[42:46], 16)
-    # sap_number = frame[40:44] # PID
-
     with open("Protocols/pid.yaml", "r") as stream:
         get_PID = (yaml.safe_load(stream))
 
     sap_number = frame[40:44]
-    # print(frame)
-    #  print(get_PID)
-    #  print(sap_number)
 
     if sap_number in get_PID:
         PID = get_PID[sap_number]
-        # print(sap_number, PID)
         return PID
-
-    # print(sap_number)
-
-
-# with open("Protocols/l2.txt", "r") as protocol_file:
-#    for line in protocol_file:
-# print(line)
-#   if line == "#LSAPs\n":
-#   print(line)
-# folder_line = protocol_file.readline()
-# print(folder_line)
-#       for line_2 in protocol_file:
-#           if line_2 == "#IP Protocol numbers\n":
-#               break
-# else:
-#   print(line_2)
-# print(line)
-
-# print(f.read()
+    else:
+        return sap_number
 
 
 def _format_frame(frame):
-    # print("frame to format:", frame)
-
     new_frame = ''
     counter = 0
     for char in frame:
@@ -102,21 +70,15 @@ def _format_frame(frame):
         else:
             new_frame_with_spaces += char
             counter += 1
-
-    # new_frame = new_frame.upper()
-    # print(new_frame)
-    # new_frame_with_spaces += '\n'
     new_frame_with_spaces = new_frame_with_spaces.upper()
-    # print(new_frame_with_spaces)
     return new_frame_with_spaces
 
 
 def _find_second_eth_layer_protocol(frame):
     hex_number = frame[24:28]
-    # print(frame )
     with open("Protocols/ether_type.yaml", "r") as stream:
         get_ethertype = (yaml.safe_load(stream))
-    # print(hex_number)
+
     if hex_number in get_ethertype:
         ether_type = get_ethertype[hex_number]
         return ether_type
@@ -125,7 +87,6 @@ def _find_second_eth_layer_protocol(frame):
 
 
 def _find_ip(frame, protocol):
-    # print(frame, protocol)
     if protocol == "IPv4":
         src = _find_src_ip_IPv4(frame)
         dst = _find_dst_ip_IPv4(frame)
@@ -194,98 +155,24 @@ def _find_dst_ip_ARP(frame):
 
 
 def _find_IPv4_protocol(frame):
+    # print(frame)
     hex_number = frame[46:48]
-    # hex_number = str(hex_number)
-    #  hex_number = "0x" + hex_number
 
-    # hex_number = frame[24:28]
     with open("Protocols/protocol.yaml", "r") as stream:
         get_protocol = (yaml.safe_load(stream))
 
     ipv4_protocol = get_protocol[hex_number]
-    # print(ipv4_protocol)
-
-    # with open("Protocols/l2.txt") as protocol_file:
-    #   for line in protocol_file:
-    #       if line == "#IP Protocol numbers\n":
-    #           for line_2 in protocol_file:
-    #               if line_2 == "#TCP ports\n":
-    #                   break
-    #    else:
-    # first_four = line_2[0:4]
-    #   if hex_number == first_four:
-    #       prtc = line_2[7:10]
-
-    # print(hex_number, prtc)
     return ipv4_protocol
 
 
 def _find_src_TCP_app_protocol(frame):
     src_port_number = frame[68:72]
     return src_port_number
-    #  src_well_known_port = '.'
-
-    #  with open("Protocols/app_protocol.yaml", "r") as stream:
-    #    check_for_app_protocol = (yaml.safe_load(stream))
-
-    ## if src_port_number in check_for_app_protocol:
-    #  print("source app protocol exists")
-    #     src_well_known_port = check_for_app_protocol[src_port_number]
-    #    return src_port_number, src_well_known_port
-    # print(src_well_known_port)
-    # else:
-    # print(src_port_number)
-    #     return src_port_number, src_well_known_port
-
-    # ipv4_protocol = get_protocol[hex_number]
-    src_well_known_port = ''
-    dst_well_known_port = ''
-
-    # with open("Protocols/l2.txt") as port_file:
-    #    for line in port_file:
-    #       if line == "#TCP ports\n":
-    #           for line_2 in port_file:
-    #               if line_2 == "#UDP ports\n":
-    #                   break
-    #               else:
-    #                   first_six = line_2[0:6]
-    #                   if src_port_number == first_six:
-    #                       src_well_known_port = " ".join(re.findall("[a-zA-Z]+", line_2))
-    #                   if dst_port_number == first_six:
-    #                       dst_well_known_port = " ".join(re.findall("[a-zA-Z]+", line_2))
-
-    #  print(src_well_known_port, dst_well_known_port)
-
-
-# return src_port_number
-
-# print(src_port_number)
-# print(dst_port_number)
 
 
 def _find_dst_TCP_app_protocol(frame):
     dst_port_number = frame[72:76]
-    # print(dst_port_number)
-    # with open("Protocols/app_protocol.yaml", "r") as stream:
-    #     check_for_app_protocol = (yaml.safe_load(stream))
-    # if dst_port_number in check_for_app_protocol:
-    #     dst_port_number = check_for_app_protocol[dst_port_number]
-
-    #  print(dst_port_number)
-
-    # dst_well_known_port = ''
     return dst_port_number
-
-
-#  with open("Protocols/app_protocol.yaml", "r") as stream:
-#     check_for_app_protocol = (yaml.safe_load(stream))
-
-# if dst_port_number in check_for_app_protocol:
-#   # print("dst app protocol exists")
-#   dst_well_known_port = check_for_app_protocol[dst_port_number]
-#   return dst_port_number, dst_well_known_port
-# else:
-#   return dst_port_number, dst_well_known_port
 
 
 def _check_if_its_is_well_known_protocol(src_port, dst_port):
@@ -302,10 +189,66 @@ def _check_if_its_is_well_known_protocol(src_port, dst_port):
         return None
 
 
+def _start_to_analyze_TCP_communication(tcp_pcap):
+    order = 1
+    for tcp_pkt in tcp_pcap:
+        tcp_frame = scapy.raw(tcp_pkt).hex()
+        # tcp_frame = _format_frame(tcp_frame)
+        # print(tcp_frame)
+        # print(tcp_frame)
+
+        # TREBA NAJST IBA TCP RAMCE
+        is_IPv4 = _find_second_eth_layer_protocol(tcp_frame)
+        if is_IPv4 == "IPv4":
+            is_tcp_protocol = _find_IPv4_protocol(tcp_frame)
+            if is_tcp_protocol == "TCP":  # nasiel som TCP protokol, tak idem riešiť komunikácie
+                if _check_for_three_hand_handshake(tcp_frame, order, tcp_pcap):
+
+
+        order += 1
+
+
+def _check_for_three_hand_handshake(frame, check_order, tcp_pcap):  # zistiť začiatok komunikácie
+    order = 1
+    flag = _get_flags(frame)
+    flag2 = 0
+    flag3 = 0
+    # print(flag)
+
+    if flag == "000010":  # found SYN, time to check next two packets
+        for check_for_next_two_packets in tcp_pcap:
+            tcp_frame = scapy.raw(check_for_next_two_packets).hex()
+            if order == check_order + 1:  # check for second packet, aka check for SYN, ACK
+                flag2 = _get_flags(tcp_frame)
+
+            if order == check_order + 2:  # check for third packet, aka check for ACK
+                flag3 = _get_flags(tcp_frame)
+
+            order += 1
+    if flag == "000010" and flag2 == "010010" and flag3 == "010000":  # found start of a communication
+        return True
+    else:
+        return False
+
+
+def _get_flags(frame):
+    flag = int(frame[93:96], 16)
+    flag = (bin(flag)[2:].zfill(8)[2:])
+    return flag
+
+
 if __name__ == '__main__':
     # fileName = input("Zadajte názov súboru: ")
-    # pcap = scapy.rdpcap(fileName)
-    pcap = scapy.rdpcap("pcap_files/trace-27.pcap")
+    # pcap = scapy.rdpcap
+
+    switch = input("Chcete analyzovať aj komunikáciu? (-p)")
+    switch_protocol = input("Zvolte si typ protokolu: ")
+    pcap = scapy.rdpcap("pcap_files/eth-4.pcap")
+
+    if switch == "-p":
+        if switch_protocol == "HTTP" or switch_protocol == "TELNET" or switch_protocol == "SSH" or switch_protocol == "FTP radiace" or switch_protocol == "FTP datove":
+            _start_to_analyze_TCP_communication(pcap)
+
     order = 1
     initial_dictionary = {'name': 'PKS2022/23',
                           'pcap_name': 'all.cap'}
@@ -314,11 +257,6 @@ if __name__ == '__main__':
     max_packets_dictionary = {"max_send_packets_by": []}
     unique_src_ip_list = []
     unique_counter = []
-
-    # for pkt in pcap:
-    #    frameInHex = scapy.raw(pkt).hex()
-    #   print(order, frameInHex, "\n")
-    #   order = order + 1
 
     with open("frames.yaml", "w") as file:
         yaml.dump(initial_dictionary, file, default_flow_style=False, sort_keys=False)
@@ -331,21 +269,14 @@ if __name__ == '__main__':
         else:
             len_frame_medium = 64
 
-        # print("\n", order,"\n", pkt)
         frameInHex = scapy.raw(pkt).hex()
-        # print("\n", order, "\n", frameInHex)
-        # order = 1
-        # for packet in pcap:
-        #    frameInHex = scapy.raw(packet).hex()
-        #   print(order, frameInHex, "\n")
-        #   order = order + 1
         destination_mac = _find_destination_mac(frameInHex)
         source_mac = _find_source_mac(frameInHex)
         frame_type = _find_frame_type(frameInHex)
         formated_frame = _format_frame(frameInHex)
         formated_frame += "\n"
 
-        print(frame_type, order)
+        # print(frame_type, order)
 
         if frame_type == "IEE 802.3 - Raw" or frame_type == "IEE 802.3 LLC":
             frames_dictionary = {"frame_nuber": order,
@@ -377,7 +308,6 @@ if __name__ == '__main__':
             second_layer_protocol = _find_second_eth_layer_protocol(frameInHex)
 
             if second_layer_protocol == 0:
-                print("got here")
                 frames_dictionary = {"frame_number": order,
                                      "len_frame_pcap": len_frame_pcap,
                                      "len_frame_medium": len_frame_medium,
@@ -389,7 +319,7 @@ if __name__ == '__main__':
                 packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
 
-            print(second_layer_protocol)
+            # print(second_layer_protocol)
             if second_layer_protocol == "ARP":
                 src_ip, dst_ip = _find_ip(frameInHex, second_layer_protocol)
 
@@ -494,26 +424,25 @@ if __name__ == '__main__':
 
     max_packets = 0
     max_send_packets_by = []
+
     for i in range(len(unique_counter)):
-        # print(unique_counter[i])
         temp = unique_counter[i]
+
         if max_packets == temp:
             max_packets = temp
             max_send_packets_by.append(unique_src_ip_list[i])
+
         elif max_packets < temp:
             max_packets = temp
             max_send_packets_by.clear()
             max_send_packets_by.append(unique_src_ip_list[i])
+
         src_ip_dictionary = {"nodes": unique_src_ip_list[i],
                              "number_of_sent_packets": unique_counter[i]}
         ipv4_packets_dictionary["ipv4_senders"].append(src_ip_dictionary)
 
-    print(max_send_packets_by)
-
     for i in range(len(max_send_packets_by)):
         max_packets_dictionary["max_send_packets_by"].append(max_send_packets_by[i])
-
-    print(max_packets_dictionary)
 
     with open('frames.yaml', 'r+') as output_stream:
         yaml = ruamel.yaml.YAML()
