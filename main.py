@@ -2,6 +2,8 @@ import scapy.all as scapy
 import yaml
 import ruamel.yaml.scalarstring
 
+global_tcp_packet_list = []
+
 
 def _find_destination_mac(frame):
     mac_type = frame[0:12]
@@ -283,14 +285,264 @@ def _check_for_three_hand_handshake(frame, check_order, tcp_pcap, order):  # zis
 
     if flag == "000010" and flag2 == "010010" and flag3 == "010000":  # found start of a communication
         # print("found start")
-        _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pcap)
+        _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pcap, source_list[4])
         return True
     else:
         return False
 
 
-def _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pcap):
-    print(source_list, destination_list)
+def _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pcap, order):  # hladam koniec
+    # print("Source:", source_list, destination_list)
+    # order = source_list[4]
+    counter = 1
+    source = []
+    for find_end in tcp_pcap:
+        # print(counter)
+        if counter < order:
+            # print("check" ,counter)
+            counter += 1  # prejdem na paket kde začala komunikácia
+        else:
+            tcp_frame = scapy.raw(find_end).hex()
+            flag = _get_flags(tcp_frame)
+            # print(flag)
+
+            if flag == "010001":  # nasiel som FIN ACK, porovnavam, ci to patri mojej komunikácii a zistujem FIN ACK, ACK, FIN ACK, ACK
+                # print(counter, flag, "found FIN, ACK")
+                # tcp_frame = scapy.raw(tcp_frame).hex()
+                found_FIN_ACK = False
+                source.append(_find_src_ip_IPv4(tcp_frame))
+                source.append(_find_dst_ip_IPv4(tcp_frame))
+                reformat_port = int(_find_src_TCP_app_protocol(tcp_frame), 16)
+                source.append(reformat_port)
+                reformat_port = int(_find_dst_TCP_app_protocol(tcp_frame), 16)
+                source.append(reformat_port)
+                source.append(counter)
+                # print(source)
+
+                if (source[0] == source_list[0] and source[1] == source_list[1] and source[2] == source_list[2] and
+                    source[3] == source_list[3]) or (
+                        source[0] == destination_list[0] and source[1] == destination_list[1] and source[2] ==
+                        destination_list[2] and source[3] == destination_list[
+                            3]):  # nasiel som zhodu, skontrolujem, ci komunikácia ide ukoncit
+                    found_FIN_ACK = True
+
+                if found_FIN_ACK:  # idem hladat ACK od druheho paketu
+
+                    counter_FIN_ACK = 1
+                    for FIN_ACK in tcp_pcap:
+                        # print(source, counter_FIN_ACK)
+                        if counter_FIN_ACK < source[4]:
+                            counter_FIN_ACK += 1
+                        else:
+                            FIN_ACK_frame = scapy.raw(FIN_ACK).hex()
+                            flag_ACK = _get_flags(FIN_ACK_frame)
+                            if flag_ACK == "010000":  # nasiel som ACK, zistujem, ci to patri mojej komunikácii
+                                source_ACK = []
+                                found_FIN_ACK = False
+                                source_ACK.append(_find_src_ip_IPv4(FIN_ACK_frame))
+                                source_ACK.append(_find_dst_ip_IPv4(FIN_ACK_frame))
+                                reformat_port = int(_find_src_TCP_app_protocol(FIN_ACK_frame), 16)
+                                source_ACK.append(reformat_port)
+                                reformat_port = int(_find_dst_TCP_app_protocol(FIN_ACK_frame), 16)
+                                source_ACK.append(reformat_port)
+                                source_ACK.append(counter_FIN_ACK)
+                                # print(source, source_ACK)
+
+                                if source[0] == source_ACK[1] and source[1] == source_ACK[0] and source[2] == \
+                                        source_ACK[3] and source[3] == source_ACK[2]:  # nasiel som ACK
+                                    # print(source_ACK)
+                                    found_FIN_ACK = True
+
+                                if found_FIN_ACK:  # nasiel som FIN ACK, hladam dalsi FIN ACK od posledneho paketu
+                                    found_FIN_ACK_2, source_for_ACK_2 = _find_FIN_ACK_2(tcp_pcap, source_ACK)
+
+                                    if found_FIN_ACK_2:  # uz iba najst posledny ACK
+                                        found_ACK_2, ending_packet = _find_ACK_2(tcp_pcap, source_for_ACK_2)
+
+                                        if found_ACK_2:  # nasiel som koniec komunikácie, zakončila sa FIN ACK, ACK, FIN ACK, ACK
+                                            # print(source_list, ending_packet)
+                                            #ending_packet = source_for_ACK_2
+                                            _def_TCP_communications_print(source_list, ending_packet, source_for_ACK_2, tcp_pcap)
+
+                                # print(source, source_ACK)
+
+                                # print("found ack", counter_FIN_ACK)
+
+                            # print(counter_FIN_ACK, FIN_ACK_frame)
+                            counter_FIN_ACK += 1
+
+                    # print(flag)
+                    # print(source, source_list, destination_list)
+                source.clear()
+            # print(tcp_frame)
+            counter += 1
+
+
+def _find_FIN_ACK_2(tcp_pcap, source):
+    counter = 1
+    # print(source)
+    source_FIN_ACK = []
+    for find_FIN_ACK in tcp_pcap:
+        if counter < source[4]:
+            counter += 1
+        else:
+            FIN_ACK_frame = scapy.raw(find_FIN_ACK).hex()
+            # print(counter, FIN_ACK_frame)
+            flag = _get_flags(FIN_ACK_frame)
+            source_FIN_ACK = []
+            if flag == "010001":  # found FIN_ACK, skontrolujem ci je to moja komunikácia
+                # found_FIN_ACK = False
+                source_FIN_ACK.append(_find_src_ip_IPv4(FIN_ACK_frame))
+                source_FIN_ACK.append(_find_dst_ip_IPv4(FIN_ACK_frame))
+                reformat_port = int(_find_src_TCP_app_protocol(FIN_ACK_frame), 16)
+                source_FIN_ACK.append(reformat_port)
+                reformat_port = int(_find_dst_TCP_app_protocol(FIN_ACK_frame), 16)
+                source_FIN_ACK.append(reformat_port)
+                source_FIN_ACK.append(counter)
+
+                if source[0] == source_FIN_ACK[0] and source[1] == source_FIN_ACK[1] and source[2] == source_FIN_ACK[
+                    2] and source[3] == source_FIN_ACK[
+                    3]:  # nasiel som druhy FIN_ACK, uz iba ACK od druheho zdroja a mam kompletnu komunikáciu
+                    # print(source_FIN_ACK)
+                    return True, source_FIN_ACK
+
+            counter += 1
+
+    return False, source_FIN_ACK
+
+
+def _find_ACK_2(tcp_pcap, source):
+    # print(source)
+    source_ACK_2 = []
+    counter = 1
+    for find_ACK_2 in tcp_pcap:
+        if counter < source[4]:
+            counter += 1
+        else:
+            ACK_2_frame = scapy.raw(find_ACK_2).hex()
+            source_ACK_2 = []
+            # print(counter,ACK_2_frame)
+            flag = _get_flags(ACK_2_frame)
+            if flag == "010000":
+                source_ACK_2.append(_find_src_ip_IPv4(ACK_2_frame))
+                source_ACK_2.append(_find_dst_ip_IPv4(ACK_2_frame))
+                reformat_port = int(_find_src_TCP_app_protocol(ACK_2_frame), 16)
+                source_ACK_2.append(reformat_port)
+                reformat_port = int(_find_dst_TCP_app_protocol(ACK_2_frame), 16)
+                source_ACK_2.append(reformat_port)
+                source_ACK_2.append(counter)
+
+                if source[0] == source_ACK_2[1] and source[1] == source_ACK_2[0] and source[2] == source_ACK_2[3] and \
+                        source[3] == source_ACK_2[2]:  # nasiel som druhy ACK
+                    # print(source, source_ACK_2)
+                    return True, source_ACK_2
+
+                # print(source, source_ACK_2)
+
+                # print(flag)
+            counter += 1
+
+    return False, source_ACK_2
+
+
+def _def_TCP_communications_print(source_packet, ending_packet, opposite_packet, tcp_pcap):
+    start = 1
+    end = ending_packet[4]
+    #print(source_packet, ending_packet)
+    tcp_packets_dictionary = {"complete comms": {"number comm": start,
+                                                  "src_comm": source_packet[0],
+                                                  "dst_comm": source_packet[1],
+                                                  "packets": []}}
+    for TCP_print in tcp_pcap:
+        frame_flag = False
+        if start < source_packet[4]:
+            tcp_frame = scapy.raw(TCP_print).hex()
+            #print(start, tcp_frame)
+            start += 1
+        elif start <= end:
+            frame = scapy.raw(TCP_print).hex()
+            #print(start, frame)
+            frame_list = _get_the_needed_info_for_comparison(frame)
+            frame_list.append(start)
+            #print(frame_list)
+            if (frame_list[0] == source_packet[0] and frame_list[1] == source_packet[1] and frame_list[2] ==
+                source_packet[2] and frame_list[3] == source_packet[3]) or (frame_list[0] == opposite_packet[0] and
+                                                                            frame_list[1] == opposite_packet[1] and
+                                                                            frame_list[2] == opposite_packet[2] and
+                                                                            frame_list[3] ==
+                                                                            opposite_packet[3]):
+               # print(frame_list)
+                len_frame_pcap = int(len(tcp_frame))
+                if len_frame_pcap >= 60:
+                    len_frame_medium = len_frame_pcap
+                    len_frame_medium += 4
+                else:
+                    len_frame_medium = 64
+
+                frame_type = _find_frame_type(tcp_frame)
+                source_mac = _find_source_mac(tcp_frame)
+                destination_mac = _find_destination_mac(tcp_frame)
+                ether_type = _find_second_eth_layer_protocol(tcp_frame)
+                src_ip = _find_src_ip_IPv4(tcp_frame)
+                dst_ip = _find_dst_ip_IPv4(tcp_frame)
+                protocol = _find_IPv4_protocol(tcp_frame)
+                src_port = _find_src_TCP_app_protocol(tcp_frame)
+                dst_port = _find_dst_TCP_app_protocol(tcp_frame)
+                app_protocol = _check_if_its_is_well_known_protocol(src_port, dst_port)
+                src_port = int(src_port, 16)
+                dst_port = int(dst_port, 16)
+                formated_frame = _format_frame(tcp_frame)
+                packet_dict = {"frame_number": start,
+                                     "len_frame_pcap": len_frame_pcap,
+                                     "len_frame_medium": len_frame_medium,
+                                     "frame_type": frame_type,
+                                     "src_mac": source_mac,
+                                     "dst_mac": destination_mac,
+                                     "ether_type": ether_type,
+                                     "src_ip": src_ip,
+                                     "dst_ip": dst_ip,
+                                     "protocol": protocol,
+                                     "src_port": src_port,
+                                     "dst_port": dst_port,
+                                     "app_protocol": app_protocol,
+                                     "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                                     }
+                tcp_packets_dictionary["complete comms"]["packets"].append(packet_dict)
+                # order += 1
+
+                #pass
+
+            start += 1
+
+    #print(ending_packet)
+    # print(tcp_packets_dictionary)
+    global_tcp_packet_list.append(tcp_packets_dictionary)
+    print(global_tcp_packet_list)
+    with open('tcp_communications.yaml', 'r+') as output_stream:
+        yaml = ruamel.yaml.YAML()
+        yaml.default_flow_style = False
+        yaml.dump(global_tcp_packet_list, output_stream)
+        #yaml.dump(tcp_packets_dictionary, output_stream)
+
+    #with open('tcp_communications.yaml','r') as yamlfile:
+    #   cur_yaml = yaml.safe_load(yamlfile)
+    #if cur_yaml:
+            #   with open('tcp_communications.yaml','w') as yamlfile:
+            #yaml.dump(tcp_packets_dictionary, yamlfile)
+
+
+    pass
+
+
+def _get_the_needed_info_for_comparison(frame):
+    list = []
+    list.append(_find_src_ip_IPv4(frame))
+    list.append(_find_dst_ip_IPv4(frame))
+    reformat_port = int(_find_src_TCP_app_protocol(frame), 16)
+    list.append(reformat_port)
+    reformat_port = int(_find_dst_TCP_app_protocol(frame), 16)
+    list.append(reformat_port)
+    return list
 
 
 def _get_flags(frame):
@@ -307,10 +559,11 @@ if __name__ == '__main__':
 
     switch = input("Chcete analyzovať aj komunikáciu? (-p)")
     switch_protocol = input("Zvolte si typ protokolu: ")
-    pcap = scapy.rdpcap("pcap_files/eth-4.pcap")
+    pcap = scapy.rdpcap("pcap_files/eth-4.pcap")  # NAZOV SEM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     if switch == "-p":
-        if switch_protocol == "HTTP" or switch_protocol == "TELNET" or switch_protocol == "SSH" or switch_protocol == "FTP radiace" or switch_protocol == "FTP datove":
+        if switch_protocol == "HTTP" or switch_protocol == "TELNET" or switch_protocol == "SSH" or switch_protocol == \
+                "FTP radiace" or switch_protocol == "FTP datove":
             _start_to_analyze_TCP_communication(pcap)
 
     order = 1
