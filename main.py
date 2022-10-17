@@ -202,38 +202,102 @@ def _start_to_analyze_TCP_communication(tcp_pcap):
         if is_IPv4 == "IPv4":
             is_tcp_protocol = _find_IPv4_protocol(tcp_frame)
             if is_tcp_protocol == "TCP":  # nasiel som TCP protokol, tak idem riešiť komunikácie
-                if _check_for_three_hand_handshake(tcp_frame, order, tcp_pcap):
-
+                if _check_for_three_hand_handshake(tcp_frame, order, tcp_pcap, order):
+                    pass
 
         order += 1
 
 
-def _check_for_three_hand_handshake(frame, check_order, tcp_pcap):  # zistiť začiatok komunikácie
-    order = 1
+def _check_for_three_hand_handshake(frame, check_order, tcp_pcap, order):  # zistiť začiatok komunikácie
     flag = _get_flags(frame)
     flag2 = 0
     flag3 = 0
+    source_list = []
+    destination_list = []
+    source_list_ACK = []
+    reformat_port = 0
+    check_for_dst_ip = ''
     # print(flag)
 
     if flag == "000010":  # found SYN, time to check next two packets
-        for check_for_next_two_packets in tcp_pcap:
-            tcp_frame = scapy.raw(check_for_next_two_packets).hex()
-            if order == check_order + 1:  # check for second packet, aka check for SYN, ACK
+        source_list.append(_find_src_ip_IPv4(frame))
+        source_list.append(_find_dst_ip_IPv4(frame))
+        reformat_port = int(_find_src_TCP_app_protocol(frame), 16)
+        source_list.append(reformat_port)
+        reformat_port = int(_find_dst_TCP_app_protocol(frame), 16)
+        source_list.append(reformat_port)
+        source_list.append(order)
+
+        order = 1
+
+        for THH_pkt in tcp_pcap:  # prehladavam cely subor ci najdem SYN, ACK
+            tcp_frame = scapy.raw(THH_pkt).hex()
+            destination_list.append(_find_src_ip_IPv4(tcp_frame))
+            destination_list.append(_find_dst_ip_IPv4(tcp_frame))
+            reformat_port = int(_find_src_TCP_app_protocol(tcp_frame), 16)
+            destination_list.append(reformat_port)
+            reformat_port = int(_find_dst_TCP_app_protocol(tcp_frame), 16)
+            destination_list.append(reformat_port)
+            destination_list.append(order)
+
+            if source_list[0] == destination_list[1] and source_list[1] == destination_list[0] and source_list[2] == \
+                    destination_list[3] and source_list[3] == destination_list[2]:
                 flag2 = _get_flags(tcp_frame)
+                break
+            else:
+                destination_list.clear()
+                order += 1
 
-            if order == check_order + 2:  # check for third packet, aka check for ACK
-                flag3 = _get_flags(tcp_frame)
+        if flag2 == "010010":  # hladam ACK
+            # print("got here")
+            order = 1
+            for THH_pkt_2 in tcp_pcap:
+                tcp_frame = scapy.raw(THH_pkt_2).hex()
+                source_list_ACK.append(_find_src_ip_IPv4(tcp_frame))
+                source_list_ACK.append(_find_dst_ip_IPv4(tcp_frame))
+                reformat_port = int(_find_src_TCP_app_protocol(tcp_frame), 16)
+                source_list_ACK.append(reformat_port)
+                reformat_port = int(_find_dst_TCP_app_protocol(tcp_frame), 16)
+                source_list_ACK.append(reformat_port)
+                source_list_ACK.append(order)
+                # flag3 = _get_flags(tcp_frame)
+                # print(destination_list, source_list_ACK)
 
-            order += 1
+                if source_list_ACK[0] == destination_list[1] and source_list_ACK[1] == destination_list[0] and \
+                        source_list_ACK[2] == destination_list[3] and source_list_ACK[3] == destination_list[2]:
+                    flag3 = _get_flags(tcp_frame)
+                    if flag3 == "010000":
+                        # print(flag3)
+                        break
+                    else:
+                        source_list_ACK.clear()
+                        order += 1
+                else:
+                    source_list_ACK.clear()
+                    order += 1
+
+        # if flag3 == "010000":
+        # break
+        # print(source_list, "\n", destination_list,"\n", source_list_ACK)
+        # print(flag, flag2, flag3)
+
     if flag == "000010" and flag2 == "010010" and flag3 == "010000":  # found start of a communication
+        # print("found start")
+        _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pcap)
         return True
     else:
         return False
 
 
+def _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pcap):
+    print(source_list, destination_list)
+
+
 def _get_flags(frame):
     flag = int(frame[93:96], 16)
+    # print("int flag:" ,flag)
     flag = (bin(flag)[2:].zfill(8)[2:])
+    # print(flag)
     return flag
 
 
