@@ -361,8 +361,9 @@ def _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pca
 
                                         if found_ACK_2:  # nasiel som koniec komunikácie, zakončila sa FIN ACK, ACK, FIN ACK, ACK
                                             # print(source_list, ending_packet)
-                                            #ending_packet = source_for_ACK_2
-                                            _def_TCP_communications_print(source_list, ending_packet, source_for_ACK_2, tcp_pcap)
+                                            # ending_packet = source_for_ACK_2
+                                            _def_TCP_communications_print(source_list, ending_packet, source_for_ACK_2,
+                                                                          tcp_pcap)
 
                                 # print(source, source_ACK)
 
@@ -448,30 +449,30 @@ def _find_ACK_2(tcp_pcap, source):
 def _def_TCP_communications_print(source_packet, ending_packet, opposite_packet, tcp_pcap):
     start = 1
     end = ending_packet[4]
-    #print(source_packet, ending_packet)
+    # print(source_packet, ending_packet)
     tcp_packets_dictionary = {"complete comms": {"number comm": start,
-                                                  "src_comm": source_packet[0],
-                                                  "dst_comm": source_packet[1],
-                                                  "packets": []}}
+                                                 "src_comm": source_packet[0],
+                                                 "dst_comm": source_packet[1],
+                                                 "packets": []}}
     for TCP_print in tcp_pcap:
         frame_flag = False
         if start < source_packet[4]:
             tcp_frame = scapy.raw(TCP_print).hex()
-            #print(start, tcp_frame)
+            # print(start, tcp_frame)
             start += 1
         elif start <= end:
             frame = scapy.raw(TCP_print).hex()
-            #print(start, frame)
+            # print(start, frame)
             frame_list = _get_the_needed_info_for_comparison(frame)
             frame_list.append(start)
-            #print(frame_list)
+            # print(frame_list)
             if (frame_list[0] == source_packet[0] and frame_list[1] == source_packet[1] and frame_list[2] ==
                 source_packet[2] and frame_list[3] == source_packet[3]) or (frame_list[0] == opposite_packet[0] and
                                                                             frame_list[1] == opposite_packet[1] and
                                                                             frame_list[2] == opposite_packet[2] and
                                                                             frame_list[3] ==
                                                                             opposite_packet[3]):
-               # print(frame_list)
+                # print(frame_list)
                 len_frame_pcap = int(len(tcp_frame))
                 if len_frame_pcap >= 60:
                     len_frame_medium = len_frame_pcap
@@ -493,28 +494,28 @@ def _def_TCP_communications_print(source_packet, ending_packet, opposite_packet,
                 dst_port = int(dst_port, 16)
                 formated_frame = _format_frame(tcp_frame)
                 packet_dict = {"frame_number": start,
-                                     "len_frame_pcap": len_frame_pcap,
-                                     "len_frame_medium": len_frame_medium,
-                                     "frame_type": frame_type,
-                                     "src_mac": source_mac,
-                                     "dst_mac": destination_mac,
-                                     "ether_type": ether_type,
-                                     "src_ip": src_ip,
-                                     "dst_ip": dst_ip,
-                                     "protocol": protocol,
-                                     "src_port": src_port,
-                                     "dst_port": dst_port,
-                                     "app_protocol": app_protocol,
-                                     "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
-                                     }
+                               "len_frame_pcap": len_frame_pcap,
+                               "len_frame_medium": len_frame_medium,
+                               "frame_type": frame_type,
+                               "src_mac": source_mac,
+                               "dst_mac": destination_mac,
+                               "ether_type": ether_type,
+                               "src_ip": src_ip,
+                               "dst_ip": dst_ip,
+                               "protocol": protocol,
+                               "src_port": src_port,
+                               "dst_port": dst_port,
+                               "app_protocol": app_protocol,
+                               "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                               }
                 tcp_packets_dictionary["complete comms"]["packets"].append(packet_dict)
                 # order += 1
 
-                #pass
+                # pass
 
             start += 1
 
-    #print(ending_packet)
+    # print(ending_packet)
     # print(tcp_packets_dictionary)
     global_tcp_packet_list.append(tcp_packets_dictionary)
     print(global_tcp_packet_list)
@@ -522,14 +523,13 @@ def _def_TCP_communications_print(source_packet, ending_packet, opposite_packet,
         yaml = ruamel.yaml.YAML()
         yaml.default_flow_style = False
         yaml.dump(global_tcp_packet_list, output_stream)
-        #yaml.dump(tcp_packets_dictionary, output_stream)
+        # yaml.dump(tcp_packets_dictionary, output_stream)
 
-    #with open('tcp_communications.yaml','r') as yamlfile:
+    # with open('tcp_communications.yaml','r') as yamlfile:
     #   cur_yaml = yaml.safe_load(yamlfile)
-    #if cur_yaml:
-            #   with open('tcp_communications.yaml','w') as yamlfile:
-            #yaml.dump(tcp_packets_dictionary, yamlfile)
-
+    # if cur_yaml:
+    #   with open('tcp_communications.yaml','w') as yamlfile:
+    # yaml.dump(tcp_packets_dictionary, yamlfile)
 
     pass
 
@@ -553,13 +553,43 @@ def _get_flags(frame):
     return flag
 
 
+def _check_if_switch_protocol_exists(protocol):
+    with open("Protocols/app_protocol.yaml", "r") as stream:  # TCP/UDP protokoly
+        get_file = (yaml.safe_load(stream))
+        if protocol in get_file.values():
+            return True, "TCP/UDP"
+    with open("Protocols/protocol.yaml", "r") as stream:  # IPv4 protokoly
+        get_file = (yaml.safe_load(stream))
+        if protocol in get_file.values():
+            return True, "IPv4"
+    with open("Protocols/ether_type.yaml", "r") as stream:  # ether type like ARP, IPv4 etc.
+        get_file = (yaml.safe_load(stream))
+        if protocol in get_file.values():
+            return True, "Ether_type"
+
+    return False, None
+
+
 if __name__ == '__main__':
     # fileName = input("Zadajte názov súboru: ")
     # pcap = scapy.rdpcap
-
+    switch_flag = False
+    protocol_origin = None
+    switch_protocol = None
     switch = input("Chcete analyzovať aj komunikáciu? (-p)")
-    switch_protocol = input("Zvolte si typ protokolu: ")
-    pcap = scapy.rdpcap("pcap_files/eth-4.pcap")  # NAZOV SEM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    if switch == "-p":
+        while not switch_flag:
+            switch_protocol = input("Zvolte si typ protokolu: ")
+            switch_flag, protocol_origin = _check_if_switch_protocol_exists(switch_protocol)
+            if not switch_flag:
+                print("Zadali ste zly protokol")
+    # print(switch_protocol)
+    # switch_flag = False
+    pcap = scapy.rdpcap("pcap_files/trace-27.pcap")  # NAZOV SEM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    # if switch_protocol in
+
+    # print(switch_flag)
 
     if switch == "-p":
         if switch_protocol == "HTTP" or switch_protocol == "TELNET" or switch_protocol == "SSH" or switch_protocol == \
@@ -574,6 +604,7 @@ if __name__ == '__main__':
     max_packets_dictionary = {"max_send_packets_by": []}
     unique_src_ip_list = []
     unique_counter = []
+    filtered_list = []
 
     with open("frames.yaml", "w") as file:
         yaml.dump(initial_dictionary, file, default_flow_style=False, sort_keys=False)
@@ -604,7 +635,8 @@ if __name__ == '__main__':
                                  "dst_mac": destination_mac,
                                  "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
                                  }
-            packets_dictionary["packets"].append(frames_dictionary)
+            if not switch_flag:
+                packets_dictionary["packets"].append(frames_dictionary)
             order += 1
 
         if frame_type == "IEE 802.3 s LLC a SNAP":
@@ -618,7 +650,8 @@ if __name__ == '__main__':
                                  "pid": pid,
                                  "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
                                  }
-            packets_dictionary["packets"].append(frames_dictionary)
+            if not switch_flag:
+                packets_dictionary["packets"].append(frames_dictionary)
             order += 1
 
         if frame_type == "ETHERNET II":
@@ -633,11 +666,13 @@ if __name__ == '__main__':
                                      "dst_mac": destination_mac,
                                      "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
                                      }
-                packets_dictionary["packets"].append(frames_dictionary)
+
+                if not switch_flag:
+                    packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
 
             # print(second_layer_protocol)
-            if second_layer_protocol == "ARP":
+            elif second_layer_protocol == "ARP":
                 src_ip, dst_ip = _find_ip(frameInHex, second_layer_protocol)
 
                 frames_dictionary = {"frame_number": order,
@@ -651,9 +686,13 @@ if __name__ == '__main__':
                                      "dst_ip": dst_ip,
                                      "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
                                      }
-
-                packets_dictionary["packets"].append(frames_dictionary)
+                if not switch_flag:
+                    packets_dictionary["packets"].append(frames_dictionary)
+                if switch_flag and switch_protocol == "ARP":
+                    packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
+                #if switch_flag and protocol == "ARP":
+                 #   packets_dictionary
 
             elif second_layer_protocol == "IPv6":
                 frames_dictionary = {"frame_number": order,
@@ -665,8 +704,10 @@ if __name__ == '__main__':
                                      "ether_type": second_layer_protocol,
                                      "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
                                      }
-
-                packets_dictionary["packets"].append(frames_dictionary)
+                if not switch_flag:
+                    packets_dictionary["packets"].append(frames_dictionary)
+                if switch_flag and switch_protocol == "IPv6":
+                    packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
 
             elif second_layer_protocol == "IPv4":
@@ -689,6 +730,7 @@ if __name__ == '__main__':
                     app_protocol = _check_if_its_is_well_known_protocol(src_port, dst_port)
                     src_port = int(src_port, 16)
                     dst_port = int(dst_port, 16)
+                    # print(app_protocol)
 
                     frames_dictionary = {"frame_number": order,
                                          "len_frame_pcap": len_frame_pcap,
@@ -705,8 +747,11 @@ if __name__ == '__main__':
                                          "app_protocol": app_protocol,
                                          "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
                                          }
-
-                    packets_dictionary["packets"].append(frames_dictionary)
+                    if not switch_flag:
+                        packets_dictionary["packets"].append(frames_dictionary)
+                    # print(switch_flag, protocol_origin, app_protocol)
+                    if switch_flag and protocol_origin == "TCP/UDP" and switch_protocol == app_protocol:
+                        packets_dictionary["packets"].append(frames_dictionary)
                     order += 1
 
                 else:
@@ -722,8 +767,8 @@ if __name__ == '__main__':
                                          "protocol": protocol,
                                          "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
                                          }
-
-                    packets_dictionary["packets"].append(frames_dictionary)
+                    if not switch_flag:
+                        packets_dictionary["packets"].append(frames_dictionary)
                     order += 1
 
             else:
@@ -735,8 +780,8 @@ if __name__ == '__main__':
                                      "dst_mac": destination_mac,
                                      "ether_type": second_layer_protocol,
                                      "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)}
-
-                packets_dictionary["packets"].append(frames_dictionary)
+                if not switch_flag:
+                    packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
 
     max_packets = 0
