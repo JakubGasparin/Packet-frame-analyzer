@@ -285,10 +285,140 @@ def _check_for_three_hand_handshake(frame, check_order, tcp_pcap, order):  # zis
 
     if flag == "000010" and flag2 == "010010" and flag3 == "010000":  # found start of a communication
         # print("found start")
-        _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pcap, source_list[4])
+        # _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pcap, source_list[4])
+        _check_for_end_of_TWH(source_list, destination_list, tcp_pcap, source_list[4])
         return True
     else:
         return False
+
+
+def _check_for_end_of_TWH(source_list, destination_list, tcp_pcap, order):
+    ending_packet = []
+    counter = 1
+    possible_end_1 = ['FIN_ACK', 'ACK', 'FIN_ACK', 'ACK']
+    possible_end_2 = ['FIN', 'FIN_ACK', 'ACK']
+    possible_end_3 = ['FIN_ACK', 'FIN_ACK', 'ACK', 'ACK']
+    possible_end_4 = ['RST']
+    check_for_end_flags = ['1', '2', '3', '4']
+    opposite = []
+    start_of_end = []
+
+    for find_end in tcp_pcap:
+        # filler
+        tcp_frame = scapy.raw(find_end).hex()
+        # print(counter)
+        if counter < order:
+            counter += 1  # prejdem na zaciatok komunikácie
+        else:
+            if _check_if_its_TCP(tcp_frame):
+                flag = _get_flags(tcp_frame)
+                #print(check_for_end_flags)
+                # print(source_list, destination_list)
+                # print(flag)
+                # if flag_ACK == "010100" or flag_ACK == "000100"
+
+                if flag == "010001":  # first FIN_ACK, pracujem s  FIN_ACK
+                    found_pkt = _get_packet_information(tcp_frame)
+                    found_pkt.append(counter)
+                    if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
+                        check_for_end_flags[0] = "FIN_ACK"
+                        #print(found_pkt, counter)
+
+                if flag == "010000" and check_for_end_flags[0] == "FIN_ACK":  # ACK, toto zrejme bude FIN_ACK, ACK, FIN_ACK, ACK
+                    found_pkt = _get_packet_information(tcp_frame)
+                    found_pkt.append(counter)
+                    if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
+                        check_for_end_flags[1] = "ACK"
+                        #print(found_pkt, counter)
+                if flag == "010001" and check_for_end_flags[1] == "ACK":  # druhy FIN_ACK
+                    found_pkt = _get_packet_information(tcp_frame)
+                    found_pkt.append(counter)
+                    if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
+                        check_for_end_flags[2] = "FIN_ACK"
+                        #print(found_pkt, counter)
+                if flag == "010000" and check_for_end_flags[2] == "FIN_ACK":  # druhy ACK
+                    found_pkt = _get_packet_information(tcp_frame)
+                    found_pkt.append(counter)
+                    if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
+                        check_for_end_flags[3] = "ACK"
+                        ending_packet = found_pkt
+                        ending_packet.append(counter)
+                        #print(ending_packet)
+
+                if flag == "010001" and check_for_end_flags[0] == "FIN_ACK": # druhy FIN_ACK toto zrejme bude FIN_ACK, FIN_ACK, ACK, ACK
+                    found_pkt = _get_packet_information(tcp_frame)
+                    found_pkt.append(counter)
+                    if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
+                        check_for_end_flags[1] = "FIN_ACK"
+                if flag == "010000" and check_for_end_flags[1] == "FIN_ACK":  # ACK
+                    found_pkt = _get_packet_information(tcp_frame)
+                    found_pkt.append(counter)
+                    if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
+                        check_for_end_flags[2] = "ACK"
+                if flag == "010000" and check_for_end_flags[2] == "ACK":  # posledny ACK
+                    found_pkt = _get_packet_information(tcp_frame)
+                    found_pkt.append(counter)
+                    if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
+                        check_for_end_flags[3] = "ACK"
+                        ending_packet = found_pkt
+                        ending_packet.append(counter)
+
+                if flag == "010100" or flag == "000100":  # RST
+                    found_pkt = _get_packet_information(tcp_frame)
+                    found_pkt.append(counter)
+                    if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
+                        check_for_end_flags.clear()
+                        check_for_end_flags.append("RST")
+                        ending_packet = found_pkt
+                # print(check_for_end_flags, counter)
+
+                if check_for_end_flags == possible_end_1 or check_for_end_flags == possible_end_4:
+                    print(check_for_end_flags, source_list, destination_list, ending_packet)
+                    check_for_end_flags = ['1', '2', '3', '4']
+            counter += 1
+
+
+def _compare_packets_in_TCP_communication_source(found, source):
+    if found[0] == source[0] and found[1] == source[1] and found[1] == source[1]:
+        return True
+    return False
+
+
+def _compare_packets_in_TCP_communication_destination(found, source):
+    if found[0] == source[0] and found[1] == source[1] and found[1] == source[1]:
+        return True
+    return False
+
+
+def _compare_packets_in_TCP_communication(found, source, destination):
+    # print(found, source, destination)
+    if (found[0] == source[0] and found[1] == source[1] and found[2] == source[2] and
+        found[3] == source[3]) or (found[0] == destination[0] and found[1] == destination[1] and
+                                   found[2] == destination[2] and found[3] == destination[3]):
+        return True
+    return False
+
+
+def _get_packet_information(frame):
+    pkt_inf = []
+    pkt_inf.append(_find_src_ip_IPv4(frame))
+    pkt_inf.append(_find_dst_ip_IPv4(frame))
+    reformat_port = int(_find_src_TCP_app_protocol(frame), 16)
+    pkt_inf.append(reformat_port)
+    reformat_port = int(_find_dst_TCP_app_protocol(frame), 16)
+    pkt_inf.append(reformat_port)
+    return pkt_inf
+
+
+def _check_if_its_TCP(frame):
+    ether_type = _find_frame_type(frame)
+    if ether_type == "ETHERNET II":
+        second_layer_protocol = _find_second_eth_layer_protocol(frame)
+        if second_layer_protocol == "IPv4":
+            protocol = _find_IPv4_protocol(frame)
+            if protocol == "TCP" or protocol == "UDP":
+                return True
+    return False
 
 
 def _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pcap, order):  # hladam koniec
@@ -296,6 +426,7 @@ def _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pca
     # order = source_list[4]
     counter = 1
     source = []
+    ending_packet = []
     for find_end in tcp_pcap:
         # print(counter)
         if counter < order:
@@ -336,6 +467,19 @@ def _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pca
                         else:
                             FIN_ACK_frame = scapy.raw(FIN_ACK).hex()
                             flag_ACK = _get_flags(FIN_ACK_frame)
+                            # print(source)
+                            # print(flag_ACK)
+                            if flag_ACK == "010100" or flag_ACK == "000100":  # found RST
+                                # print("found rst")
+                                ending_packet.append(_find_src_ip_IPv4(tcp_frame))
+                                ending_packet.append(_find_dst_ip_IPv4(tcp_frame))
+                                reformat_port = int(_find_src_TCP_app_protocol(tcp_frame), 16)
+                                ending_packet.append(reformat_port)
+                                reformat_port = int(_find_dst_TCP_app_protocol(tcp_frame), 16)
+                                ending_packet.append(reformat_port)
+                                ending_packet.append(counter_FIN_ACK)
+                                _found_RST(tcp_pcap, source, ending_packet)
+
                             if flag_ACK == "010000":  # nasiel som ACK, zistujem, ci to patri mojej komunikácii
                                 source_ACK = []
                                 found_FIN_ACK = False
@@ -375,8 +519,25 @@ def _check_for_end_of_three_way_handshake(source_list, destination_list, tcp_pca
                     # print(flag)
                     # print(source, source_list, destination_list)
                 source.clear()
+
             # print(tcp_frame)
-            counter += 1
+        counter += 1
+
+
+def _found_RST(tcp_pcap, source_list, ending_packet):
+    destination_list = []
+    destination_list.append(source_list[1])
+    destination_list.append(source_list[0])
+    destination_list.append(source_list[3])
+    destination_list.append(source_list[2])
+    # print(source_list)
+
+    if (ending_packet[0] == source_list[0] and ending_packet[1] == source_list[1] and ending_packet[2] == source_list[2]
+        and ending_packet[3] == source_list[3]) or (ending_packet[0] == destination_list[0] and
+                                                    ending_packet[1] == destination_list[1] and
+                                                    ending_packet[2] == destination_list[2] and
+                                                    ending_packet[3] == destination_list[3]):
+        print(ending_packet)
 
 
 def _find_FIN_ACK_2(tcp_pcap, source):
@@ -585,7 +746,7 @@ if __name__ == '__main__':
                 print("Zadali ste zly protokol")
     # print(switch_protocol)
     # switch_flag = False
-    pcap = scapy.rdpcap("pcap_files/trace-27.pcap")  # NAZOV SEM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    pcap = scapy.rdpcap("pcap_files/eth-4.pcap")  # NAZOV SEM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     # if switch_protocol in
 
@@ -593,7 +754,7 @@ if __name__ == '__main__':
 
     if switch == "-p":
         if switch_protocol == "HTTP" or switch_protocol == "TELNET" or switch_protocol == "SSH" or switch_protocol == \
-                "FTP radiace" or switch_protocol == "FTP datove":
+                "FTP-CONTROl" or switch_protocol == "FTP-DATA":
             _start_to_analyze_TCP_communication(pcap)
 
     order = 1
@@ -691,8 +852,8 @@ if __name__ == '__main__':
                 if switch_flag and switch_protocol == "ARP":
                     packets_dictionary["packets"].append(frames_dictionary)
                 order += 1
-                #if switch_flag and protocol == "ARP":
-                 #   packets_dictionary
+                # if switch_flag and protocol == "ARP":
+                #   packets_dictionary
 
             elif second_layer_protocol == "IPv6":
                 frames_dictionary = {"frame_number": order,
