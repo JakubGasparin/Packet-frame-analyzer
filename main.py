@@ -317,6 +317,8 @@ def _check_for_end_of_TWH(source_list, destination_list, tcp_pcap, order):
                 # print(flag)
                 # if flag_ACK == "010100" or flag_ACK == "000100"
 
+               # print(flag, flag[-1])
+
                 if flag == "010001":  # first FIN_ACK, pracujem s  FIN_ACK
                     found_pkt = _get_packet_information(tcp_frame)
                     found_pkt.append(counter)
@@ -372,10 +374,78 @@ def _check_for_end_of_TWH(source_list, destination_list, tcp_pcap, order):
                         ending_packet = found_pkt
                 # print(check_for_end_flags, counter)
 
-                if check_for_end_flags == possible_end_1 or check_for_end_flags == possible_end_4:
+                if check_for_end_flags == possible_end_1 or \
+                        check_for_end_flags == possible_end_2 or \
+                        check_for_end_flags == possible_end_3 or \
+                        check_for_end_flags == possible_end_4:
                     print(check_for_end_flags, source_list, destination_list, ending_packet)
+                    _print_TCP(source_list, destination_list, ending_packet, tcp_pcap)
                     check_for_end_flags = ['1', '2', '3', '4']
             counter += 1
+
+
+def _print_TCP(source, dst, ending_packet, tcp_pcap):
+    order = 1
+    tcp_packets_dictionary = {"complete comms": {"number comm": order,
+                                                 "src_comm": source[0],
+                                                 "dst_comm": source[1],
+                                                 "packets": []}}
+    for TCP_print in tcp_pcap:
+        if order < source[4]:
+            order += 1
+        elif order <= ending_packet[4]:
+            frame = scapy.raw(TCP_print).hex()
+            if _check_if_its_TCP(frame):
+                frame_list = _get_packet_information(frame)
+                frame_list.append(order)
+                print(frame_list)
+                if _compare_packets_in_TCP_communication(frame_list, source, dst):
+                    len_frame_pcap = int(len(tcp_pcap))
+                    if len_frame_pcap >= 60:
+                        len_frame_medium = len_frame_pcap
+                        len_frame_medium += 4
+                    else:
+                        len_frame_medium = 64
+
+                    frame_type = _find_frame_type(frame)
+                    source_mac = _find_source_mac(frame)
+                    destination_mac = _find_destination_mac(frame)
+                    ether_type = _find_second_eth_layer_protocol(frame)
+                    src_ip = _find_src_ip_IPv4(frame)
+                    dst_ip = _find_dst_ip_IPv4(frame)
+                    protocol = _find_IPv4_protocol(frame)
+                    src_port = _find_src_TCP_app_protocol(frame)
+                    dst_port = _find_dst_TCP_app_protocol(frame)
+                    app_protocol = _check_if_its_is_well_known_protocol(src_port, dst_port)
+                    src_port = int(src_port, 16)
+                    dst_port = int(dst_port, 16)
+                    formated_frame = _format_frame(frame)
+                    formated_frame += "\n"
+
+                    packet_dict = {"frame_number": order,
+                                   "len_frame_pcap": len_frame_pcap,
+                                   "len_frame_medium": len_frame_medium,
+                                   "frame_type": frame_type,
+                                   "src_mac": source_mac,
+                                   "dst_mac": destination_mac,
+                                   "ether_type": ether_type,
+                                   "src_ip": src_ip,
+                                   "dst_ip": dst_ip,
+                                   "protocol": protocol,
+                                   "src_port": src_port,
+                                   "dst_port": dst_port,
+                                   "app_protocol": app_protocol,
+                                   "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                                   }
+                    tcp_packets_dictionary["complete comms"]["packets"].append(packet_dict)
+            order += 1
+    #print(tcp_packets_dictionary)
+    global_tcp_packet_list.append(tcp_packets_dictionary)
+    #print(global_tcp_packet_list)
+    with open('tcp_communications.yaml', "r+") as output_stream:
+        yaml = ruamel.yaml.YAML()
+        yaml.default_flow_style = False
+        yaml.dump(global_tcp_packet_list, output_stream)
 
 
 def _compare_packets_in_TCP_communication_source(found, source):
@@ -391,7 +461,6 @@ def _compare_packets_in_TCP_communication_destination(found, source):
 
 
 def _compare_packets_in_TCP_communication(found, source, destination):
-    # print(found, source, destination)
     if (found[0] == source[0] and found[1] == source[1] and found[2] == source[2] and
         found[3] == source[3]) or (found[0] == destination[0] and found[1] == destination[1] and
                                    found[2] == destination[2] and found[3] == destination[3]):
@@ -678,12 +747,12 @@ def _def_TCP_communications_print(source_packet, ending_packet, opposite_packet,
 
     # print(ending_packet)
     # print(tcp_packets_dictionary)
-    global_tcp_packet_list.append(tcp_packets_dictionary)
+    #global_tcp_packet_list.append(tcp_packets_dictionary)
     print(global_tcp_packet_list)
     with open('tcp_communications.yaml', 'r+') as output_stream:
         yaml = ruamel.yaml.YAML()
         yaml.default_flow_style = False
-        yaml.dump(global_tcp_packet_list, output_stream)
+        #yaml.dump(global_tcp_packet_list, output_stream)
         # yaml.dump(tcp_packets_dictionary, output_stream)
 
     # with open('tcp_communications.yaml','r') as yamlfile:
