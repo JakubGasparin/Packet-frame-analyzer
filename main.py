@@ -3,6 +3,10 @@ import yaml
 import ruamel.yaml.scalarstring
 
 global_tcp_packet_list = []
+global_first_unfinished_packet = []
+
+global_TFTP_packet_list = []
+global_TFTP_counter = 1
 
 
 def _find_destination_mac(frame):
@@ -191,8 +195,48 @@ def _check_if_its_is_well_known_protocol(src_port, dst_port):
         return None
 
 
+def _check_for_first_unfinished(tcp_pcap):
+    found_SYN = None
+    for pkt in tcp_pcap:
+        tcp_frame = scapy.raw(pkt).hex()
+        if _check_if_its_TCP(tcp_frame):
+            flag = _get_flags(tcp_frame)
+            flag = list(flag)
+
+            if flag[4] == "1":  # na tejto pozíci je vlajka SYN
+                found_SYN = _get_packet_information(tcp_frame)
+                if _find_end(found_SYN, tcp_pcap):
+                    global_first_unfinished_packet = found_SYN
+
+            # print(flag)
+
+
+def _find_end(packet, tcp_pcap):
+    new_pkt = []
+    for pkt in tcp_pcap:
+        frame = scapy.raw(pkt).hex()
+        if _check_if_its_TCP(frame):
+            flag = _get_flags(tcp_pcap)
+            flag = list(flag)
+            if flag[5] == "1" or flag[3] == "1" or flag[2] == "1":
+                if _compare_incomplete(packet, frame):
+                    return True
+    return False
+
+
+def _compare_incomplete(pkt1, pkt2):
+    if pkt1 == pkt2:
+        return True
+    if pkt1[0] == pkt2[1] and pkt1[1] == pkt2[0] and pkt1[2] == pkt2[3] and pkt1[3] == pkt2[2]:
+        return True
+    else:
+        return False
+
+
 def _start_to_analyze_TCP_communication(tcp_pcap):
     order = 1
+
+    _check_for_first_unfinished(tcp_pcap)
     for tcp_pkt in tcp_pcap:
         tcp_frame = scapy.raw(tcp_pkt).hex()
         # tcp_frame = _format_frame(tcp_frame)
@@ -312,32 +356,33 @@ def _check_for_end_of_TWH(source_list, destination_list, tcp_pcap, order):
         else:
             if _check_if_its_TCP(tcp_frame):
                 flag = _get_flags(tcp_frame)
-                #print(check_for_end_flags)
+                # print(check_for_end_flags)
                 # print(source_list, destination_list)
                 # print(flag)
                 # if flag_ACK == "010100" or flag_ACK == "000100"
 
-               # print(flag, flag[-1])
+                # print(flag, flag[-1])
 
                 if flag == "010001":  # first FIN_ACK, pracujem s  FIN_ACK
                     found_pkt = _get_packet_information(tcp_frame)
                     found_pkt.append(counter)
                     if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
                         check_for_end_flags[0] = "FIN_ACK"
-                        #print(found_pkt, counter)
+                        # print(found_pkt, counter)
 
-                if flag == "010000" and check_for_end_flags[0] == "FIN_ACK":  # ACK, toto zrejme bude FIN_ACK, ACK, FIN_ACK, ACK
+                if flag == "010000" and check_for_end_flags[
+                    0] == "FIN_ACK":  # ACK, toto zrejme bude FIN_ACK, ACK, FIN_ACK, ACK
                     found_pkt = _get_packet_information(tcp_frame)
                     found_pkt.append(counter)
                     if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
                         check_for_end_flags[1] = "ACK"
-                        #print(found_pkt, counter)
+                        # print(found_pkt, counter)
                 if flag == "010001" and check_for_end_flags[1] == "ACK":  # druhy FIN_ACK
                     found_pkt = _get_packet_information(tcp_frame)
                     found_pkt.append(counter)
                     if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
                         check_for_end_flags[2] = "FIN_ACK"
-                        #print(found_pkt, counter)
+                        # print(found_pkt, counter)
                 if flag == "010000" and check_for_end_flags[2] == "FIN_ACK":  # druhy ACK
                     found_pkt = _get_packet_information(tcp_frame)
                     found_pkt.append(counter)
@@ -345,9 +390,10 @@ def _check_for_end_of_TWH(source_list, destination_list, tcp_pcap, order):
                         check_for_end_flags[3] = "ACK"
                         ending_packet = found_pkt
                         ending_packet.append(counter)
-                        #print(ending_packet)
+                        # print(ending_packet)
 
-                if flag == "010001" and check_for_end_flags[0] == "FIN_ACK": # druhy FIN_ACK toto zrejme bude FIN_ACK, FIN_ACK, ACK, ACK
+                if flag == "010001" and check_for_end_flags[
+                    0] == "FIN_ACK":  # druhy FIN_ACK toto zrejme bude FIN_ACK, FIN_ACK, ACK, ACK
                     found_pkt = _get_packet_information(tcp_frame)
                     found_pkt.append(counter)
                     if _compare_packets_in_TCP_communication(found_pkt, source_list, destination_list):
@@ -386,7 +432,8 @@ def _check_for_end_of_TWH(source_list, destination_list, tcp_pcap, order):
 
 def _print_TCP(source, dst, ending_packet, tcp_pcap):
     order = 1
-    tcp_packets_dictionary = {"complete comms": {"number comm": order,
+    global global_TFTP_counter
+    tcp_packets_dictionary = {"complete comms": {"number comm": global_TFTP_counter,
                                                  "src_comm": source[0],
                                                  "dst_comm": source[1],
                                                  "packets": []}}
@@ -398,7 +445,7 @@ def _print_TCP(source, dst, ending_packet, tcp_pcap):
             if _check_if_its_TCP(frame):
                 frame_list = _get_packet_information(frame)
                 frame_list.append(order)
-                print(frame_list)
+                #print(frame_list)
                 if _compare_packets_in_TCP_communication(frame_list, source, dst):
                     len_frame_pcap = int(len(tcp_pcap))
                     if len_frame_pcap >= 60:
@@ -439,13 +486,14 @@ def _print_TCP(source, dst, ending_packet, tcp_pcap):
                                    }
                     tcp_packets_dictionary["complete comms"]["packets"].append(packet_dict)
             order += 1
-    #print(tcp_packets_dictionary)
+    # print(tcp_packets_dictionary)
     global_tcp_packet_list.append(tcp_packets_dictionary)
-    #print(global_tcp_packet_list)
+    # print(global_tcp_packet_list)
     with open('tcp_communications.yaml', "r+") as output_stream:
         yaml = ruamel.yaml.YAML()
         yaml.default_flow_style = False
         yaml.dump(global_tcp_packet_list, output_stream)
+    global_TFTP_counter += 1
 
 
 def _compare_packets_in_TCP_communication_source(found, source):
@@ -747,12 +795,12 @@ def _def_TCP_communications_print(source_packet, ending_packet, opposite_packet,
 
     # print(ending_packet)
     # print(tcp_packets_dictionary)
-    #global_tcp_packet_list.append(tcp_packets_dictionary)
-    print(global_tcp_packet_list)
+    # global_tcp_packet_list.append(tcp_packets_dictionary)
+    #print(global_tcp_packet_list)
     with open('tcp_communications.yaml', 'r+') as output_stream:
         yaml = ruamel.yaml.YAML()
         yaml.default_flow_style = False
-        #yaml.dump(global_tcp_packet_list, output_stream)
+        # yaml.dump(global_tcp_packet_list, output_stream)
         # yaml.dump(tcp_packets_dictionary, output_stream)
 
     # with open('tcp_communications.yaml','r') as yamlfile:
@@ -800,6 +848,199 @@ def _check_if_switch_protocol_exists(protocol):
     return False, None
 
 
+def _start_analyzing_TFTP(pcap):
+    order = 1
+
+    for TFTP_comm in pcap:
+        TFTP_frame = scapy.raw(TFTP_comm).hex()
+        if _check_if_its_UDP(TFTP_frame):
+            app_protocol = _find_dst_TCP_app_protocol(TFTP_frame)
+            # print(app_protocol)
+            app_protocol = int(app_protocol, 16)
+            # print(app_protocol)
+            if app_protocol == 69:
+                first_source_port = int(_find_src_TCP_app_protocol(TFTP_frame), 16)
+                # print(first_source_port)
+                first_packet = _get_packet_information(TFTP_frame)
+                _find_TFTP_comm(first_packet, pcap)
+                # print(first_packet)
+
+
+def _find_TFTP_comm(original, pcap):
+    order = 1
+    comm = False
+    for TFTP in pcap:
+        TFTP_frame = scapy.raw(TFTP).hex()
+        if _check_if_its_UDP(TFTP_frame):
+            frame_info = _get_packet_information(TFTP_frame)
+            if frame_info[0] == original[1] and frame_info[1] == original[0] and frame_info[3] == original[
+                2]:  # porovnavam vsetko okrem jedneho portu
+                # print(frame_info)
+                second_packet = frame_info
+                comm = True
+            if comm and frame_info[0] == second_packet[1] and frame_info[1] == second_packet[0] and frame_info[
+                2] == second_packet[3] and frame_info[3] == second_packet[2]:
+                first_packet = frame_info
+                break
+                # print(first_packet, second_packet)
+                # print(order)
+
+        order += 1
+    #print(original)
+    _print_TFTP(first_packet, second_packet, original, pcap)
+
+
+def _print_TFTP(first_packet, second_packet, original_packet, pcap):
+    # print(first_packet, second_packet, original_packet)
+    global global_TFTP_counter
+    order = 1
+    udp_packets_dictionary = {"complete comms": {"number comm": global_TFTP_counter,
+                                                 "src_comm": original_packet[0],
+                                                 "dst_comm": original_packet[1],
+                                                 "packets": []}}
+
+    # udp_packets_dictionary["complete comms"]["packets"].append(packet_dict)
+    # order = 1
+
+    found_checkpoint = False
+
+    for TFTP in pcap:
+        TFTP_frame = scapy.raw(TFTP).hex()
+        if _check_if_its_UDP(TFTP_frame):
+            frame = _get_packet_information(TFTP_frame)
+            if frame == original_packet:
+                found_checkpoint = True
+                len_frame_pcap = int(len(TFTP_frame))
+                if len_frame_pcap >= 60:
+                    len_frame_medium = len_frame_pcap
+                    len_frame_medium += 4
+                else:
+                    len_frame_medium = 64
+                list_for_orignal, formated_frame, app_protocol = _get_UDP_info(TFTP_frame)
+
+                packets_dictionary = {"frame_number": order,
+                                      "len_frame_pcap": len_frame_pcap,
+                                      "len_frame_medium": len_frame_medium,
+                                      "frame_type": list_for_orignal[0],
+                                      "src_mac": list_for_orignal[1],
+                                      "dst_mac": list_for_orignal[2],
+                                      "ether_type": "ETHERNET II",
+                                      "src_ip": list_for_orignal[3],
+                                      "dst_ip": list_for_orignal[4],
+                                      "protocol": list_for_orignal[5],
+                                      "src_port": list_for_orignal[6],
+                                      "dst_port": list_for_orignal[7],
+                                      "app_protocol": app_protocol,
+                                      "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                                      }
+
+                udp_packets_dictionary["complete comms"]["packets"].append(packets_dictionary)
+                #order += 1
+
+            if found_checkpoint:
+                if frame == first_packet or frame == second_packet:
+                    len_frame_pcap = int(len(TFTP_frame))
+                    if len_frame_pcap >= 60:
+                        len_frame_medium = len_frame_pcap
+                        len_frame_medium += 4
+                    else:
+                        len_frame_medium = 64
+                    list_for_rest, formated_frame, app_protocol = _get_UDP_info(TFTP_frame)
+                    packet_dict = {"frame_number": order,
+                                   "len_frame_pcap": len_frame_pcap,
+                                   "len_frame_medium": len_frame_medium,
+                                   "frame_type": list_for_rest[0],
+                                   "src_mac": list_for_rest[1],
+                                   "dst_mac": list_for_rest[2],
+                                   "ether_type": "ETHERNET II",
+                                   "src_ip": list_for_rest[3],
+                                   "dst_ip": list_for_rest[4],
+                                   "protocol": list_for_rest[5],
+                                   "src_port": list_for_rest[6],
+                                   "dst_port": list_for_rest[7],
+                                   "app_protocol": app_protocol,
+                                   "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                                   }
+                    # print(order, frame_to_compare)
+                    udp_packets_dictionary["complete comms"]["packets"].append(packet_dict)
+
+
+               # for TFTP2 in pcap:
+                    #    in_loop_order = order
+                    #rame_2 = scapy.raw(TFTP2).hex()
+                    #frame_to_compare = _get_packet_information(frame_2)
+                    # if frame_to_compare == first_packet or frame_to_compare == second_packet:
+                    #   len_frame_pcap = int(len(TFTP_frame))
+                    #   if len_frame_pcap >= 60:
+                    #       len_frame_medium = len_frame_pcap
+                    #       len_frame_medium += 4
+                    #   else:
+                    #       len_frame_medium = 64
+                    #   list_for_rest, formated_frame, app_protocol = _get_UDP_info(frame_2)
+                    #   packet_dict = {"frame_number": in_loop_order,
+                    #                  "len_frame_pcap": len_frame_pcap,
+                    #                  "len_frame_medium": len_frame_medium,
+                    ###                  "frame_type": list_for_rest[0],
+                    #                "src_mac": list_for_rest[1],
+                    #                  "dst_mac": list_for_rest[2],
+                    #                  "ether_type": "ETHERNET II",
+                    #                  "src_ip": list_for_rest[3],
+                    #####                  "dst_ip": list_for_rest[4],
+                    #              "protocol": list_for_rest[5],
+                    #                  "src_port": list_for_rest[6],
+                    #                  "dst_port": list_for_rest[7],
+                    #                  "app_protocol": app_protocol,
+                    #                  "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                    #                  }
+                        # print(order, frame_to_compare)
+                    #   udp_packets_dictionary["complete comms"]["packets"].append(packet_dict)
+            #   in_loop_order += 1
+        order += 1
+
+                #order += 1
+    global_TFTP_packet_list.append(udp_packets_dictionary)
+    # print(global_TFTP_packet_list)
+    with open('udp_communications.yaml', "r+") as output_stream:
+        yaml = ruamel.yaml.YAML()
+        yaml.default_flow_style = False
+        yaml.dump(global_TFTP_packet_list, output_stream)
+    global_TFTP_counter += 1
+
+
+def _check_if_its_UDP(frame):
+    ether_type = _find_frame_type(frame)
+    if ether_type == "ETHERNET II":
+        second_layer_protocol = _find_second_eth_layer_protocol(frame)
+        if second_layer_protocol == "IPv4":
+            protocol = _find_IPv4_protocol(frame)
+            if protocol == "UDP":
+                return True
+    return False
+
+
+def _get_UDP_info(frame):
+    list = []
+    #print(frame)
+    #print(type(frame))
+   # list.append(_find_frame_type(frame))
+    list.append(_find_source_mac(frame))
+    list.append(_find_destination_mac(frame))
+    list.append(_find_second_eth_layer_protocol(frame))
+    list.append(_find_src_ip_IPv4(frame))
+    list.append(_find_dst_ip_IPv4(frame))
+    list.append(_find_IPv4_protocol(frame))
+    src_port = _find_src_TCP_app_protocol(frame)
+    dst_port = _find_dst_TCP_app_protocol(frame)
+    src_port = int(src_port, 16)
+    dst_port = int(dst_port, 16)
+    list.append(src_port)
+    list.append(dst_port)
+    app_protocol = _check_if_its_is_well_known_protocol(src_port, dst_port)
+    formated_frame = _format_frame(frame)
+    #print(list)
+    return list, formated_frame, app_protocol
+
+
 if __name__ == '__main__':
     # fileName = input("Zadajte názov súboru: ")
     # pcap = scapy.rdpcap
@@ -815,7 +1056,8 @@ if __name__ == '__main__':
                 print("Zadali ste zly protokol")
     # print(switch_protocol)
     # switch_flag = False
-    pcap = scapy.rdpcap("pcap_files/eth-4.pcap")  # NAZOV SEM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    pcap = scapy.rdpcap(
+        "pcap_files/trace-15.pcap")  # NAZOV SEM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     # if switch_protocol in
 
@@ -825,6 +1067,8 @@ if __name__ == '__main__':
         if switch_protocol == "HTTP" or switch_protocol == "TELNET" or switch_protocol == "SSH" or switch_protocol == \
                 "FTP-CONTROl" or switch_protocol == "FTP-DATA":
             _start_to_analyze_TCP_communication(pcap)
+        if switch_protocol == "TFTP":
+            _start_analyzing_TFTP(pcap)
 
     order = 1
     initial_dictionary = {'name': 'PKS2022/23',
@@ -980,7 +1224,12 @@ if __name__ == '__main__':
                     if not switch_flag:
                         packets_dictionary["packets"].append(frames_dictionary)
                     # print(switch_flag, protocol_origin, app_protocol)
+                    # print(app_protocol)
+                    # print(switch_flag, protocol_origin, switch_protocol, protocol)
                     if switch_flag and protocol_origin == "TCP/UDP" and switch_protocol == app_protocol:
+                        # print(switch_protocol)
+                        packets_dictionary["packets"].append(frames_dictionary)
+                    if switch_flag and protocol_origin == "IPv4" and switch_protocol == protocol:
                         packets_dictionary["packets"].append(frames_dictionary)
                     order += 1
 
