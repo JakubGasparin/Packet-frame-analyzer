@@ -8,6 +8,10 @@ global_first_unfinished_packet = []
 global_TFTP_packet_list = []
 global_TFTP_counter = 1
 
+global_ARP_counter = 1
+
+global_ARP_packet_list = []
+
 
 def _find_destination_mac(frame):
     mac_type = frame[0:12]
@@ -1040,6 +1044,140 @@ def _get_UDP_info(frame):
     #print(list)
     return list, formated_frame, app_protocol
 
+def _start_analyzing_ARP(pcap):
+    #frameInHex = scapy.raw(pkt).hex()
+
+    ARP_request = {"packets": []}
+    ARP_reply = {"packets": []}
+    ARP_partial = {"packets": []}
+    order = 1
+
+    for ARP in pcap:
+        frameInHex = scapy.raw(ARP).hex()
+        if _check_if_its_ARP(frameInHex):
+            operation = _get_operation(frameInHex)
+            #print(order, operation)
+            if operation == "0001":
+                ARP_packet, request_packet = _get_ARP_packet_info(frameInHex, order, "REQUEST")
+
+                paired_packet, src_ip, dst_ip = _find_ARP_pair(request_packet, order, pcap)
+                if paired_packet:
+                    ARP_reply["packets"].append(ARP_packet)
+                    ARP_reply["packets"].append(paired_packet)
+                    _print_ARP(ARP_reply, ARP_partial, src_ip, dst_ip)
+                    ARP_reply = {"packets": []}
+                else:
+                    ARP_partial["packets"].append(ARP_packet)
+            if operation == "0002":
+                ARP_packet, reply_packet = _get_ARP_packet_info(frameInHex, order, "REPLY")
+                #ARP_partial["packets"].append(ARP_packet)
+                #pass
+
+        order += 1
+
+    #print(ARP_partial)
+    #print(ARP_reply)
+
+
+
+
+def _print_ARP(ARP_paired, ARP_partial, src_ip, dst_ip):
+    completed_comms_dict = {"complete_comms": []}
+    paired_arp_dictionary = {"number comm": global_ARP_counter,
+                        "src_comm": src_ip,
+                        "dst_comm": dst_ip,
+                        "packets": []}
+
+    #partial_arp_dictionary
+
+    paired_arp_dictionary["packets"].append(ARP_paired)
+    completed_comms_dict["complete_comms"].append(paired_arp_dictionary)
+    global_ARP_packet_list.append(completed_comms_dict)
+    #print(paired_arp_dictionary)
+    #print("got here")
+    print(global_ARP_packet_list)
+
+    with open("arp_communications.yaml", "r+") as output_stream:
+        yaml = ruamel.yaml.YAML()
+        yaml.default_flow_style = False
+        yaml.dump(global_ARP_packet_list, output_stream)
+
+
+def _find_ARP_pair(original_packet, order_original, pcap):
+    #print(original_packet)
+    order = 1
+
+    for ARP in pcap:
+        frameInHex = scapy.raw(ARP).hex()
+        if order >= order_original:
+            if _check_if_its_ARP(frameInHex):
+                operation = _get_operation(frameInHex)
+                #print(operation, original_packet[2])
+                if operation == "0002" and original_packet[2] == "REQUEST": # found opposites, time to check if the IPs match
+                    src_ip = _find_src_ip_ARP(frameInHex)
+                    dst_ip = _find_dst_ip_ARP(frameInHex)
+                    operation = "REPLY"
+
+                    if src_ip == original_packet[1] and dst_ip == original_packet[0]:
+                        paired_packet, list = _get_ARP_packet_info(frameInHex, order, operation)
+                        #print(paired_packet)
+                        return paired_packet, src_ip, dst_ip
+        order += 1
+    return None, None, None
+
+                # if operation == "0002": print("REPLY")
+                # print(src_ip, dst_ip)
+
+
+
+
+def _get_ARP_packet_info(frame, order, arp_opcode):
+
+    for pkt in pcap:
+        len_frame_pcap = int(len(pkt))
+        if len_frame_pcap >= 60:
+            len_frame_medium = len_frame_pcap
+            len_frame_medium += 4
+        else:
+            len_frame_medium = 64
+
+    source_mac = _find_source_mac(frame)
+    destination_mac = _find_destination_mac(frame)
+    src_ip, dst_ip = _find_ip(frame, "ARP")
+    formated_frame = _format_frame(frame)
+    list = [src_ip, dst_ip, arp_opcode]
+    #print(list)
+
+
+    arp_dictionary = {"frame_number": order,
+                         "len_frame_pcap": len_frame_pcap,
+                         "len_frame_medium": len_frame_medium,
+                         "frame_type": "ETHERNET II",
+                         "src_mac": source_mac,
+                         "dst_mac": destination_mac,
+                         "ether_type": "ARP",
+                         "arp_opcode": arp_opcode,
+                         "src_ip": src_ip,
+                         "dst_ip": dst_ip,
+                         "hexa_frame": ruamel.yaml.scalarstring.LiteralScalarString(formated_frame)
+                         }
+    return arp_dictionary, list
+
+
+
+def _get_operation(frame):
+    operation = frame[40:44]
+    return operation
+
+def _check_if_its_ARP(frame):
+    frame_type = _find_frame_type(frame)
+    if frame_type == "ETHERNET II":
+        second_layer_protocol = _find_second_eth_layer_protocol(frame)
+        if second_layer_protocol == "ARP":
+            return True
+
+
+
 
 if __name__ == '__main__':
     # fileName = input("Zadajte názov súboru: ")
@@ -1057,7 +1195,7 @@ if __name__ == '__main__':
     # print(switch_protocol)
     # switch_flag = False
     pcap = scapy.rdpcap(
-        "pcap_files/trace-15.pcap")  # NAZOV SEM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        "pcap_files/trace-12.pcap")  # NAZOV SEM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     # if switch_protocol in
 
@@ -1069,6 +1207,8 @@ if __name__ == '__main__':
             _start_to_analyze_TCP_communication(pcap)
         if switch_protocol == "TFTP":
             _start_analyzing_TFTP(pcap)
+        if switch_protocol == "ARP":
+            _start_analyzing_ARP(pcap)
 
     order = 1
     initial_dictionary = {'name': 'PKS2022/23',
